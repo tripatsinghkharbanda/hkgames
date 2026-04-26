@@ -120,7 +120,7 @@
     ];
 
     const getMultiplier = () => (Math.floor(obstaclesPassed / 10) + 1) * 2;
-    const getSpeed = () => 6 + (Math.floor(obstaclesPassed / 10));
+    const getSpeed = () => (currentLevel === 3 ? 3 : 6) + Math.floor(obstaclesPassed / 10);
 
     class FloatingText {
         constructor(x, y, text, color) { this.x = x; this.y = y; this.text = text; this.color = color; this.life = 1.0; }
@@ -200,7 +200,7 @@
         const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         if (currentLevel === 3) {
             const word = getRandomWord3();
-            obstacles.push({ x: canvas.width + 50, y: groundY - 40, w: word.length * 20 + 10, h: 40, speed: getSpeed(), word, passed: false });
+            obstacles.push({ x: canvas.width + 50, y: groundY - 55, w: Math.max(word.length * 22 + 16, 90), h: 55, speed: getSpeed(), word, passed: false });
         } else {
             obstacles.push({ x: canvas.width + 50, y: groundY - 35, w: 35, h: 35, speed: getSpeed(), char: chars[Math.floor(Math.random() * chars.length)], passed: false });
         }
@@ -243,9 +243,12 @@
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(o.x, o.y, o.w, o.h);
             if (currentLevel === 2) { ctx.fillStyle = 'white'; ctx.font = 'bold 20px Arial'; ctx.textAlign = 'center'; ctx.fillText(o.char, o.x + o.w/2, o.y - 12); }
             if (currentLevel === 3 && o.word) {
-                ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center';
-                ctx.fillStyle = 'white'; ctx.fillText(o.word, o.x + o.w/2, o.y - 14);
-                if (typedBuffer) { ctx.fillStyle = '#00ff88'; ctx.font = 'bold 13px Arial'; ctx.fillText(typedBuffer, o.x + o.w/2, o.y - 32); }
+                const midX = o.x + o.w / 2;
+                ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 6;
+                ctx.font = 'bold 20px Arial'; ctx.textAlign = 'center';
+                ctx.fillStyle = 'white'; ctx.fillText(o.word, midX, o.y + o.h / 2 + 7);
+                ctx.shadowBlur = 0;
+                if (typedBuffer) { ctx.fillStyle = '#00ff88'; ctx.font = 'bold 15px Arial'; ctx.fillText(typedBuffer, midX, o.y - 10); }
             }
             if (stickman.x + 10 > o.x && stickman.x - 10 < o.x + o.w && stickman.y > o.y) {
                 gameActive = false; uiState = 'GAMEOVER'; gameOverScreen.classList.remove('hidden'); mobileHint.classList.add('hidden');
