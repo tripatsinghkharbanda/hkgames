@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Type-Jump: Pro Performance Mobile</title>
+    <title>Car Race</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -69,10 +69,11 @@
         <canvas id="gameCanvas"></canvas>
 
         <div id="menu-start" class="overlay">
-            <h1>TYPING ACADEMY</h1>
+            <h1>CAR RACE</h1>
             <p style="color: #888; font-size: 0.7rem;">MOBILE RESPONSIVE MODE</p>
             <button onclick="startGame('TRAINING')">1. TRAINING <span>[1]</span></button>
             <button onclick="startGame('REAL')">2. REAL PLAY <span>[2]</span></button>
+            <button onclick="startGame('WORD')">3. WORD PLAY <span>[3]</span></button>
             <a href="index.html" class="home-link">← Back to Arcade Hub</a>
         </div>
 
@@ -95,17 +96,26 @@
     const NEON_BLUE = "#00f2ff";
     const NEON_PINK = "#ff007b";
     const TYPING_TIERS = ["FJ", "FJDK", "ASDFJKL;", "ASDFJKL;EI", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+    const WORDS = [
+        [], [],
+        ["AN","AT","BE","BY","DO","GO","HE","IF","IN","IS","IT","ME","MY","NO","OF","ON","OR","SO","TO","UP","US","WE"],
+        ["AND","ARE","BUT","CAN","DID","FOR","GET","GOT","HAD","HAS","HIM","HIS","HOW","ITS","LET","MAN","MAY","NOT","NOW","OUT","OWN","PUT","SAY","SEE","SHE","THE","TOO","TWO","USE","WAS","WHO","WHY","YOU"],
+        ["ALSO","BACK","BEEN","COME","DARK","DOWN","FIND","FIVE","FROM","GIVE","GOOD","HAND","HAVE","HERE","HIGH","HOME","INTO","JUST","KEEP","KIND","KNOW","LAST","LEFT","LIKE","LIVE","LONG","LOOK","MADE","MAKE","MANY","MORE","MOST","MOVE","MUCH","MUST","NAME","NEAR","NEED","NEXT","ONCE","ONLY","OPEN","OVER","PART","PAST","PLAY","REAL","SAME","SAVE","SEEM","SEND","SIDE","SOME","SOON","TAKE","TELL","THAN","THEM","THEN","THEY","THIS","TIME","TURN","VERY","WANT","WAYS","WELL","WENT","WERE","WHAT","WHEN","WILL","WITH","WORD","WORK","YEAR","YOUR"],
+        ["ABOUT","AFTER","AGAIN","BLACK","BRING","BUILD","COULD","EVERY","FOUND","GREAT","GROUP","HOUSE","LARGE","LATER","LIGHT","MIGHT","NEVER","OTHER","PLACE","POINT","RIGHT","SMALL","SOUND","STAND","START","STILL","STUDY","THEIR","THERE","THESE","THINK","THREE","UNDER","UNTIL","WATCH","WATER","WHERE","WHICH","WHILE","WHITE","WORLD","WOULD","WRITE","YOUNG"],
+        ["ALMOST","ALWAYS","AROUND","BEHIND","BETTER","DURING","ENOUGH","FAMILY","FOLLOW","FRIEND","LITTLE","NUMBER","PEOPLE","REALLY","SCHOOL","SHOULD","SIMPLE","SINGLE","SLOWLY","THINGS","TRAVEL","WITHIN"]
+    ];
 
     let gameState = 'START';
     let gameMode = 'REAL';
     let score = 0, jumpSuccessCount = 0, baseSpeed = 4.5, speedKmh = 40;
     let obstacles = [], bonuses = [], spawnTimer = 0, lastTime = performance.now();
+    let typedBuffer = '';
 
     const player = { lane: 1, x: 200, y: 500, w: 36, h: 60, isJumping: false, jumpH: 0, jumpV: 0, gravity: 0.8, jumpPower: 17 };
 
     // --- Input Logic ---
-    function moveLeft() { if(player.lane > 0) player.lane--; }
-    function moveRight() { if(player.lane < 2) player.lane++; }
+    function moveLeft() { if(player.lane > 0) { player.lane--; typedBuffer = ''; } }
+    function moveRight() { if(player.lane < 2) { player.lane++; typedBuffer = ''; } }
     function attemptJump(key = null) {
         if (!player.isJumping) {
             const target = obstacles.find(o => o.lane === player.lane && o.y < player.y && o.y > player.y - 300);
@@ -115,6 +125,26 @@
                 player.jumpV = player.jumpPower;
                 if(target) target.jumped = true;
             }
+        }
+    }
+
+    function getWordLen2() { return Math.min(2 + Math.floor(jumpSuccessCount / 10), 6); }
+    function getRandomWord2() { const arr = WORDS[getWordLen2()]; return arr[Math.floor(Math.random() * arr.length)]; }
+
+    function attemptWordInput(key) {
+        if (player.isJumping) return;
+        const target = obstacles.find(o => o.lane === player.lane && o.y < player.y && o.y > player.y - 300);
+        if (!target || !target.word) return;
+        const k = key.toUpperCase();
+        if (!/^[A-Z]$/.test(k)) { typedBuffer = ''; return; }
+        typedBuffer += k;
+        if (target.word.startsWith(typedBuffer)) {
+            if (typedBuffer === target.word) {
+                player.isJumping = true; player.jumpV = player.jumpPower; target.jumped = true; typedBuffer = '';
+            }
+        } else {
+            typedBuffer = k;
+            if (!target.word.startsWith(typedBuffer)) typedBuffer = '';
         }
     }
 
@@ -133,10 +163,12 @@
         if (gameState === 'START') {
             if (e.key === "1") startGame('TRAINING');
             if (e.key === "2") startGame('REAL');
+            if (e.key === "3") startGame('WORD');
         } else if (gameState === 'PLAYING') {
             if (e.key === "ArrowLeft") moveLeft();
             if (e.key === "ArrowRight") moveRight();
-            if (e.key === " " || e.key.length === 1) attemptJump(e.key);
+            if (gameMode === 'WORD') { if (e.key.length === 1) attemptWordInput(e.key); }
+            else if (e.key === " " || e.key.length === 1) attemptJump(e.key);
         } else if (gameState === 'OVER' && e.key === "Enter") {
             retryGame();
         }
@@ -144,7 +176,7 @@
 
     function startGame(mode) {
         gameMode = mode; score = 0; jumpSuccessCount = 0; baseSpeed = 4.5; speedKmh = 40;
-        obstacles = []; bonuses = []; player.lane = 1; gameState = 'PLAYING';
+        obstacles = []; bonuses = []; player.lane = 1; gameState = 'PLAYING'; typedBuffer = ''; player.isJumping = false; player.jumpH = 0; 
         document.querySelectorAll('.overlay').forEach(m => m.classList.add('hidden'));
         lastTime = performance.now();
     }
@@ -167,8 +199,14 @@
         spawnTimer += dt;
         if(spawnTimer > Math.max(25, 70 - (speedKmh/6))) {
             const lane = Math.floor(Math.random() * 3);
-            const tier = TYPING_TIERS[Math.min(Math.floor(jumpSuccessCount / 10), TYPING_TIERS.length - 1)];
-            obstacles.push({ lane, x: LANE_X[lane], y: -100, char: tier[Math.floor(Math.random() * tier.length)], jumped: false });
+            if (gameMode === 'WORD') {
+                obstacles.push({ lane, x: LANE_X[lane], y: -100, word: getRandomWord2(), jumped: false });
+            } else if (gameMode === 'TRAINING') {
+                obstacles.push({ lane, x: LANE_X[lane], y: -100, jumped: false });
+            } else {
+                const tier = TYPING_TIERS[Math.min(Math.floor(jumpSuccessCount / 10), TYPING_TIERS.length - 1)];
+                obstacles.push({ lane, x: LANE_X[lane], y: -100, char: tier[Math.floor(Math.random() * tier.length)], jumped: false });
+            }
             spawnTimer = 0;
         }
 
@@ -196,7 +234,21 @@
         ctx.fillStyle = "#18181c"; ctx.fillRect(20, 0, canvas.width-40, canvas.height);
         ctx.strokeStyle = "#252528"; ctx.setLineDash([20, 30]);
         for(let i=1; i<3; i++) { ctx.beginPath(); ctx.moveTo(i * (canvas.width/3), 0); ctx.lineTo(i * (canvas.width/3), canvas.height); ctx.stroke(); }
-        obstacles.forEach(o => { ctx.fillStyle = "#b33939"; ctx.beginPath(); ctx.roundRect(o.x-18, o.y, 36, 58, 5); ctx.fill(); ctx.fillStyle = "white"; ctx.font = "bold 20px Roboto Mono"; ctx.textAlign = "center"; ctx.fillText(o.char, o.x, o.y + 38); });
+        obstacles.forEach(o => {
+            if (gameMode === 'WORD') {
+                ctx.fillStyle = "#5a189a"; ctx.beginPath(); ctx.roundRect(o.x-18, o.y, 36, 58, 5); ctx.fill();
+                ctx.font = "bold 11px Roboto Mono"; ctx.textAlign = "center";
+                ctx.fillStyle = "white"; ctx.fillText(o.word || '', o.x, o.y - 5);
+                if (o.lane === player.lane && typedBuffer) { ctx.fillStyle = NEON_BLUE; ctx.fillText(typedBuffer, o.x, o.y - 19); }
+            } else if (gameMode === 'TRAINING') {
+                ctx.fillStyle = "#1a4a6e"; ctx.beginPath(); ctx.roundRect(o.x-18, o.y, 36, 58, 5); ctx.fill();
+                ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.font = "bold 9px Roboto Mono"; ctx.textAlign = "center";
+                ctx.fillText("SPC", o.x, o.y + 34);
+            } else {
+                ctx.fillStyle = "#b33939"; ctx.beginPath(); ctx.roundRect(o.x-18, o.y, 36, 58, 5); ctx.fill();
+                ctx.fillStyle = "white"; ctx.font = "bold 20px Roboto Mono"; ctx.textAlign = "center"; ctx.fillText(o.char, o.x, o.y + 38);
+            }
+        });
         if(player.isJumping) { ctx.shadowBlur = 15; ctx.shadowColor = NEON_BLUE; }
         ctx.fillStyle = NEON_BLUE; ctx.beginPath(); ctx.roundRect(player.x, player.y - player.jumpH, player.w, player.h, 6); ctx.fill(); ctx.shadowBlur = 0;
         bonuses.forEach(b => { ctx.globalAlpha = b.l; ctx.fillStyle = b.c; ctx.fillText(b.t, b.x, b.y); });

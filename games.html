@@ -32,7 +32,9 @@
             background: var(--glass); color: white; border: 2px solid rgba(255,255,255,0.1);
             border-radius: 12px; width: 90%; max-width: 320px; cursor: pointer;
             display: flex; justify-content: space-between; align-items: center;
+            outline: none; transition: border-color 0.2s, background 0.2s;
         }
+        .menu-option:hover, .menu-option:focus { border-color: var(--primary); background: rgba(0,242,255,0.08); }
 
         .key-prompt { background: white; color: black; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-right: 10px; }
 
@@ -68,11 +70,14 @@
     <div id="main-menu" class="ui-layer">
         <h1>STICKMAN RUN</h1>
         <p>Select Level to Start:</p>
-        <div class="menu-option" onclick="startGame(1)">
+        <div class="menu-option" tabindex="0" onclick="startGame(1)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startGame(1);}">
             <span>LEVEL 1 (Space Jump)</span><span class="key-prompt">1</span>
         </div>
-        <div class="menu-option" onclick="startGame(2)">
+        <div class="menu-option" tabindex="0" onclick="startGame(2)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startGame(2);}">
             <span>LEVEL 2 (Key Match)</span><span class="key-prompt">2</span>
+        </div>
+        <div class="menu-option" tabindex="0" onclick="startGame(3)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startGame(3);}">
+            <span>LEVEL 3 (Word Match)</span><span class="key-prompt">3</span>
         </div>
         <a href="index.html" class="home-link">← Back to Arcade Hub</a>
     </div>
@@ -80,10 +85,10 @@
     <div id="game-over" class="ui-layer hidden">
         <h1 style="color:#ff4b2b; -webkit-text-fill-color:#ff4b2b">CRASHED</h1>
         <p id="final-score">Final Score: 0</p>
-        <div class="menu-option" onclick="startGame(currentLevel)">
+        <div class="menu-option" tabindex="0" onclick="startGame(currentLevel)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startGame(currentLevel);}">
             <span>RETRY</span><span class="key-prompt">ENTER</span>
         </div>
-        <div class="menu-option" onclick="showMenu()">
+        <div class="menu-option" tabindex="0" onclick="showMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showMenu();}">
             <span>MAIN MENU</span><span class="key-prompt">M</span>
         </div>
         <a href="index.html" class="home-link">← Back to Arcade Hub</a>
@@ -103,6 +108,16 @@
     let gameActive = false, score = 0, obstaclesPassed = 0, currentLevel = 1;
     let particles = [], bonusTexts = [], obstacles = [], obstacleTimer = 0;
     const groundY = 400, gravity = 0.5, jumpForce = -13;
+
+    let typedBuffer = '';
+    const WORDS = [
+        [], [],
+        ["AN","AT","BE","BY","DO","GO","HE","IF","IN","IS","IT","ME","MY","NO","OF","ON","OR","SO","TO","UP","US","WE"],
+        ["AND","ARE","BUT","CAN","DID","FOR","GET","GOT","HAD","HAS","HIM","HIS","HOW","ITS","LET","MAN","MAY","NOT","NOW","OUT","OWN","PUT","SAY","SEE","SHE","THE","TOO","TWO","USE","WAS","WHO","WHY","YOU"],
+        ["ALSO","BACK","BEEN","COME","DARK","DOWN","FIND","FIVE","FROM","GIVE","GOOD","HAND","HAVE","HERE","HIGH","HOME","INTO","JUST","KEEP","KIND","KNOW","LAST","LEFT","LIKE","LIVE","LONG","LOOK","MADE","MAKE","MANY","MORE","MOST","MOVE","MUCH","MUST","NAME","NEAR","NEED","NEXT","ONCE","ONLY","OPEN","OVER","PART","PAST","PLAY","REAL","SAME","SAVE","SEEM","SEND","SIDE","SOME","SOON","TAKE","TELL","THAN","THEM","THEN","THEY","THIS","TIME","TURN","VERY","WANT","WAYS","WELL","WENT","WERE","WHAT","WHEN","WILL","WITH","WORD","WORK","YEAR","YOUR"],
+        ["ABOUT","AFTER","AGAIN","BLACK","BRING","BUILD","COULD","EVERY","FOUND","GREAT","GROUP","HOUSE","LARGE","LATER","LIGHT","MIGHT","NEVER","OTHER","PLACE","POINT","RIGHT","SMALL","SOUND","STAND","START","STILL","STUDY","THEIR","THERE","THESE","THINK","THREE","UNDER","UNTIL","WATCH","WATER","WHERE","WHICH","WHILE","WHITE","WORLD","WOULD","WRITE","YOUNG"],
+        ["ALMOST","ALWAYS","AROUND","BEHIND","BETTER","DURING","ENOUGH","FAMILY","FOLLOW","FRIEND","LITTLE","NUMBER","PEOPLE","REALLY","SCHOOL","SHOULD","SIMPLE","SINGLE","SLOWLY","THINGS","TRAVEL","WITHIN"]
+    ];
 
     const getMultiplier = () => (Math.floor(obstaclesPassed / 10) + 1) * 2;
     const getSpeed = () => 6 + (Math.floor(obstaclesPassed / 10));
@@ -142,6 +157,23 @@
         }
     }
 
+    function getWordLen3() { return Math.min(2 + Math.floor(obstaclesPassed / 10), 6); }
+    function getRandomWord3() { const arr = WORDS[getWordLen3()]; return arr[Math.floor(Math.random() * arr.length)]; }
+
+    function handleWordInput(key) {
+        if (uiState !== 'PLAYING') return;
+        if (!/^[A-Z]$/.test(key)) { typedBuffer = ''; return; }
+        const next = obstacles.find(o => o.x > stickman.x - 20);
+        if (!next) return;
+        typedBuffer += key;
+        if (next.word.startsWith(typedBuffer)) {
+            if (typedBuffer === next.word) { stickman.jump(); typedBuffer = ''; }
+        } else {
+            typedBuffer = key;
+            if (!next.word.startsWith(typedBuffer)) typedBuffer = '';
+        }
+    }
+
     // Touch Event
     canvas.addEventListener('touchstart', (e) => {
         e.preventDefault();
@@ -153,8 +185,10 @@
         if (uiState === 'MENU') {
             if (key === '1') startGame(1);
             if (key === '2') startGame(2);
+            if (key === '3') startGame(3);
         } else if (uiState === 'PLAYING') {
-            if (e.code === 'Space') handleJumpInput();
+            if (currentLevel === 3) { handleWordInput(key); }
+            else if (e.code === 'Space') handleJumpInput();
             else handleJumpInput(key);
         } else if (uiState === 'GAMEOVER') {
             if (e.code === 'Enter') startGame(currentLevel);
@@ -164,12 +198,18 @@
 
     function spawnObstacle() {
         const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        obstacles.push({ x: canvas.width + 50, y: groundY - 35, w: 35, h: 35, speed: getSpeed(), char: chars[Math.floor(Math.random() * chars.length)], passed: false });
+        if (currentLevel === 3) {
+            const word = getRandomWord3();
+            obstacles.push({ x: canvas.width + 50, y: groundY - 40, w: word.length * 20 + 10, h: 40, speed: getSpeed(), word, passed: false });
+        } else {
+            obstacles.push({ x: canvas.width + 50, y: groundY - 35, w: 35, h: 35, speed: getSpeed(), char: chars[Math.floor(Math.random() * chars.length)], passed: false });
+        }
     }
 
     function startGame(level) {
-        currentLevel = level; score = 0; obstaclesPassed = 0; obstacles = []; bonusTexts = []; gameActive = true; uiState = 'PLAYING';
+        currentLevel = level; score = 0; obstaclesPassed = 0; obstacles = []; bonusTexts = []; gameActive = true; uiState = 'PLAYING'; typedBuffer = '';
         mainMenu.classList.add('hidden'); gameOverScreen.classList.add('hidden'); hud.classList.remove('hidden'); mobileHint.classList.remove('hidden');
+        mobileHint.innerText = currentLevel === 3 ? 'TYPE THE WORD TO JUMP' : 'TAP ANYWHERE TO JUMP';
         updateHUD(); requestAnimationFrame(gameLoop);
     }
 
@@ -190,20 +230,30 @@
         stickman.update(); stickman.draw();
         bonusTexts.forEach((t, i) => { t.update(); t.draw(); if (t.life <= 0) bonusTexts.splice(i, 1); });
 
-        if (++obstacleTimer > Math.max(45, 95 - (Math.floor(obstaclesPassed/10) * 4))) { spawnObstacle(); obstacleTimer = 0; }
+        if (currentLevel === 3) {
+            if (obstacles.length === 0 && ++obstacleTimer > 80) { spawnObstacle(); obstacleTimer = 0; }
+        } else {
+            if (++obstacleTimer > Math.max(45, 95 - (Math.floor(obstaclesPassed/10) * 4))) { spawnObstacle(); obstacleTimer = 0; }
+        }
 
-        const color = currentLevel === 1 ? '#00f2ff' : '#7000ff';
+        const color = currentLevel === 1 ? '#00f2ff' : currentLevel === 2 ? '#7000ff' : '#ff6600';
         for (let i = obstacles.length - 1; i >= 0; i--) {
             const o = obstacles[i]; o.x -= o.speed;
             ctx.fillStyle = color; ctx.fillRect(o.x, o.y, o.w, o.h);
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(o.x, o.y, o.w, o.h);
             if (currentLevel === 2) { ctx.fillStyle = 'white'; ctx.font = 'bold 20px Arial'; ctx.textAlign = 'center'; ctx.fillText(o.char, o.x + o.w/2, o.y - 12); }
+            if (currentLevel === 3 && o.word) {
+                ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center';
+                ctx.fillStyle = 'white'; ctx.fillText(o.word, o.x + o.w/2, o.y - 14);
+                if (typedBuffer) { ctx.fillStyle = '#00ff88'; ctx.font = 'bold 13px Arial'; ctx.fillText(typedBuffer, o.x + o.w/2, o.y - 32); }
+            }
             if (stickman.x + 10 > o.x && stickman.x - 10 < o.x + o.w && stickman.y > o.y) {
                 gameActive = false; uiState = 'GAMEOVER'; gameOverScreen.classList.remove('hidden'); mobileHint.classList.add('hidden');
                 document.getElementById('final-score').innerText = `Final Score: ${score}`;
             }
             if (!o.passed && o.x < stickman.x) {
-                o.passed = true; const pointsGained = getMultiplier(); score += pointsGained; obstaclesPassed++;
+                o.passed = true; if (currentLevel === 3) typedBuffer = '';
+                const pointsGained = getMultiplier(); score += pointsGained; obstaclesPassed++;
                 bonusTexts.push(new FloatingText(stickman.x, stickman.y - 70, `+${pointsGained}`, '#fff')); updateHUD();
             }
             if (o.x + o.w < 0) obstacles.splice(i, 1);
