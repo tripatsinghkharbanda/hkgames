@@ -180,7 +180,7 @@
         document.getElementById('speed-val').innerText = getSpeed();
         multiplierBadge.innerText = `${getMultiplier()}X MULTIPLIER`;
     }
-
+  
     function gameLoop() {
         if (!gameActive) return;
         ctx.fillStyle = '#1e293b'; ctx.fillRect(0, 0, canvas.width, canvas.height);

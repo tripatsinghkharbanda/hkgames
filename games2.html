@@ -151,7 +151,7 @@
 
     function retryGame() { startGame(gameMode); }
     function stopGame() { gameState = 'START'; document.getElementById('menu-over').classList.add('hidden'); document.getElementById('menu-start').classList.remove('hidden'); }
-
+  
     function update(dt) {
         if(gameState !== 'PLAYING') return;
         const LANE_X = [66, 200, 333];
