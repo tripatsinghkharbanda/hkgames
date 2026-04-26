@@ -9,7 +9,7 @@
     <style>
         :root { --primary: #00f2ff; --secondary: #7000ff; --bg: #0f172a; --glass: rgba(255, 255, 255, 0.1); }
         * { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: var(--bg); font-family: 'Poppins', sans-serif; color: white; overflow: hidden; }
+        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; height: 100dvh; background-color: var(--bg); font-family: 'Poppins', sans-serif; color: white; overflow: hidden; }
 
         #game-container {
             position: relative;
@@ -56,11 +56,9 @@
         .home-link:hover { color: rgba(255,255,255,0.7); }
 
         #mobile-input { position: fixed; left: -9999px; top: 50%; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: none; outline: none; }
-        #onscreen-kb { position: absolute; bottom: 0; left: 0; right: 0; z-index: 20; background: rgba(5,10,25,0.93); padding: 4px 4px 8px; }
-        .kb-row { display: flex; justify-content: center; gap: 3px; margin-bottom: 3px; }
-        .kb-key { flex: 1 1 0; max-width: 38px; padding: 7px 0; background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.22); border-radius: 5px; color: white; font-size: 11px; font-weight: bold; text-align: center; cursor: pointer; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
-        .kb-key:active { background: rgba(0,242,255,0.45); border-color: var(--primary); }
-        .kb-del { flex: 1.6 1 0; font-size: 14px; }
+        #kb-strip { position: fixed; left: 0; right: 0; bottom: 0; height: 50px; background: rgba(5,10,25,0.97); border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; z-index: 100; gap: 14px; padding: 0 18px; }
+        #kb-strip .kb-type-btn { background: rgba(0,242,255,0.12); border: 1px solid rgba(0,242,255,0.35); color: #00f2ff; padding: 7px 22px; border-radius: 22px; font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; touch-action: manipulation; }
+        #kb-strip .kb-hint { color: #94a3b8; font-size: 0.7rem; }
 
         @media (max-width: 480px) {
             h1 { font-size: 1.3rem !important; margin-bottom: 0.1rem; }
@@ -110,11 +108,10 @@
         </div>
         <a href="index.html" class="home-link">← Back to Arcade Hub</a>
     </div>
-    <div id="onscreen-kb" class="hidden">
-        <div class="kb-row"><div class="kb-key" data-key="Q">Q</div><div class="kb-key" data-key="W">W</div><div class="kb-key" data-key="E">E</div><div class="kb-key" data-key="R">R</div><div class="kb-key" data-key="T">T</div><div class="kb-key" data-key="Y">Y</div><div class="kb-key" data-key="U">U</div><div class="kb-key" data-key="I">I</div><div class="kb-key" data-key="O">O</div><div class="kb-key" data-key="P">P</div></div>
-        <div class="kb-row"><div class="kb-key" data-key="A">A</div><div class="kb-key" data-key="S">S</div><div class="kb-key" data-key="D">D</div><div class="kb-key" data-key="F">F</div><div class="kb-key" data-key="G">G</div><div class="kb-key" data-key="H">H</div><div class="kb-key" data-key="J">J</div><div class="kb-key" data-key="K">K</div><div class="kb-key" data-key="L">L</div></div>
-        <div class="kb-row"><div class="kb-key" data-key="Z">Z</div><div class="kb-key" data-key="X">X</div><div class="kb-key" data-key="C">C</div><div class="kb-key" data-key="V">V</div><div class="kb-key" data-key="B">B</div><div class="kb-key" data-key="N">N</div><div class="kb-key" data-key="M">M</div><div class="kb-key kb-del" data-key="DEL">⌫</div></div>
-    </div>
+</div>
+<div id="kb-strip" class="hidden">
+    <span class="kb-hint" id="kb-mode-hint">Type the letter / word shown</span>
+    <div class="kb-type-btn" onclick="document.getElementById('mobile-input').focus()">⌨️ Tap to Type</div>
 </div>
 <input id="mobile-input" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="characters">
 <script>
@@ -125,7 +122,7 @@
     const gameOverScreen = document.getElementById('game-over');
     const multiplierBadge = document.getElementById('multiplier-badge');
     const mobileHint = document.getElementById('mobile-hint');
-    const onscreenKb = document.getElementById('onscreen-kb');
+    const kbStrip = document.getElementById('kb-strip');
     const isMobile = 'ontouchstart' in window;
 
     // ── Sound Effects (Web Audio API) ──────────────────────
@@ -226,14 +223,16 @@
         }
     });
 
-    onscreenKb.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        const key = e.target.closest('[data-key]')?.dataset.key;
-        if (!key || uiState !== 'PLAYING') return;
-        if (key === 'DEL') { typedBuffer = typedBuffer.slice(0, -1); return; }
-        if (currentLevel === 3) handleWordInput(key);
-        else if (currentLevel === 2) handleJumpInput(key);
-    }, { passive: false });
+    function updateKbPos() {
+        if (!isMobile || !window.visualViewport) return;
+        const vv = window.visualViewport;
+        const kbH = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        kbStrip.style.bottom = kbH + 'px';
+    }
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', updateKbPos);
+        window.visualViewport.addEventListener('scroll', updateKbPos);
+    }
 
     window.addEventListener('keydown', (e) => {
         const key = e.key.toUpperCase();
@@ -264,12 +263,14 @@
     function startGame(level) {
         currentLevel = level; score = 0; obstaclesPassed = 0; obstacles = []; bonusTexts = []; gameActive = true; uiState = 'PLAYING'; typedBuffer = '';
         mainMenu.classList.add('hidden'); gameOverScreen.classList.add('hidden'); hud.classList.remove('hidden'); mobileHint.classList.remove('hidden');
-        mobileHint.innerText = currentLevel === 1 ? 'TAP TO JUMP' : currentLevel === 3 ? 'TAP SCREEN → TYPE WORD' : 'TAP SCREEN → TYPE LETTER';
-        if (isMobile && currentLevel >= 2) onscreenKb.classList.remove('hidden'); else onscreenKb.classList.add('hidden');
+        mobileHint.innerText = currentLevel === 1 ? 'TAP TO JUMP' : 'USE KEYBOARD BELOW ↓';
+        document.getElementById('kb-mode-hint').textContent = currentLevel === 3 ? 'Type the full word shown on each block' : 'Type the letter shown on each block';
+        if (isMobile && currentLevel >= 2) { kbStrip.classList.remove('hidden'); setTimeout(() => mobileInput.focus(), 350); }
+        else kbStrip.classList.add('hidden');
         updateHUD(); requestAnimationFrame(gameLoop);
     }
 
-    function showMenu() { uiState = 'MENU'; gameActive = false; mainMenu.classList.remove('hidden'); gameOverScreen.classList.add('hidden'); hud.classList.add('hidden'); mobileHint.classList.add('hidden'); onscreenKb.classList.add('hidden'); }
+    function showMenu() { uiState = 'MENU'; gameActive = false; mainMenu.classList.remove('hidden'); gameOverScreen.classList.add('hidden'); hud.classList.add('hidden'); mobileHint.classList.add('hidden'); kbStrip.classList.add('hidden'); }
 
     function updateHUD() {
         document.getElementById('score-val').innerText = score;
@@ -311,7 +312,7 @@
                 const _hs = parseInt(localStorage.getItem(_hsKey) || '0');
                 const _newHS = score > _hs;
                 if (_newHS) localStorage.setItem(_hsKey, score);
-                gameActive = false; uiState = 'GAMEOVER'; gameOverScreen.classList.remove('hidden'); mobileHint.classList.add('hidden'); onscreenKb.classList.add('hidden');
+                gameActive = false; uiState = 'GAMEOVER'; gameOverScreen.classList.remove('hidden'); mobileHint.classList.add('hidden'); kbStrip.classList.add('hidden');
                 document.getElementById('final-score').innerText = `Final Score: ${score}`;
                 document.getElementById('hs-note').innerText = _newHS ? '🏆 NEW HIGH SCORE!' : 'Best: ' + _hs;
                 playCrash();

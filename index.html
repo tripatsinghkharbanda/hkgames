@@ -97,6 +97,7 @@
         .card-1::after { background: radial-gradient(ellipse at top left, rgba(0,242,255,0.08), transparent 70%); }
         .card-2::after { background: radial-gradient(ellipse at top left, rgba(255,0,123,0.08), transparent 70%); }
         .card-3::after { background: radial-gradient(ellipse at top left, rgba(0,255,136,0.08), transparent 70%); }
+        .card-4::after { background: radial-gradient(ellipse at top left, rgba(250,204,21,0.08), transparent 70%); }
 
         .game-card:hover {
             transform: translateY(-7px);
@@ -117,6 +118,7 @@
         .card-1::before { background: linear-gradient(to right, var(--primary), var(--secondary)); }
         .card-2::before { background: linear-gradient(to right, var(--accent), var(--primary)); }
         .card-3::before { background: linear-gradient(to right, #00ff88, #7000ff); }
+        .card-4::before { background: linear-gradient(to right, #facc15, #f97316); }
 
         .card-icon {
             font-size: 2.6rem;
@@ -152,6 +154,12 @@
             background: rgba(0, 255, 136, 0.12);
             color: #00ff88;
             border: 1px solid rgba(0, 255, 136, 0.25);
+        }
+
+        .badge-4 {
+            background: rgba(250, 204, 21, 0.12);
+            color: #facc15;
+            border: 1px solid rgba(250, 204, 21, 0.25);
         }
 
         .card-title {
@@ -269,6 +277,25 @@
             <span class="card-badge badge-3">Grammar</span>
             <h2 class="card-title">Prep Quest</h2>
             <p class="card-desc">Grade 7 prepositions challenge. Read the sentence, pick the right preposition before time runs out. 3 difficulty levels with streak bonuses!</p>
+            <div class="card-tags">
+                <span class="tag">Keyboard</span>
+                <span class="tag">Touch</span>
+                <span class="tag">3 Levels</span>
+                <span class="tag">Grade 7</span>
+            </div>
+            <span class="play-btn">
+                Play Now
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            </span>
+        </a>
+
+        <a class="game-card card-4" href="games4.html">
+            <span class="card-icon">📖</span>
+            <span class="card-badge badge-4">Grammar</span>
+            <h2 class="card-title">Tense Quest</h2>
+            <p class="card-desc">Grade 7 perfect tenses challenge. Master have/has/had, irregular past participles, and present vs past perfect — all with instant explanations!</p>
             <div class="card-tags">
                 <span class="tag">Keyboard</span>
                 <span class="tag">Touch</span>

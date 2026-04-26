@@ -13,13 +13,13 @@
     <style>
         :root { --neon-blue: #00f2ff; --neon-pink: #ff007b; --bg: #0d0d0f; }
         *, *::before, *::after { box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-        body { margin: 0; background: var(--bg); color: white; font-family: 'Roboto Mono', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Roboto Mono', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; height: 100dvh; overflow: hidden; }
 
         #game-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
 
         #canvas-wrapper {
             position: relative;
-            width: min(95vw, calc(80vh * (2 / 3)));
+            width: min(95vw, calc(80dvh * (2 / 3)));
             aspect-ratio: 2 / 3;
         }
 
@@ -58,12 +58,9 @@
         .home-link:hover { color: rgba(255,255,255,0.7); }
 
         #mobile-input { position: fixed; left: -9999px; top: 50%; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: none; outline: none; }
-        #onscreen-kb { position: absolute; bottom: 0; left: 0; right: 0; z-index: 20; background: rgba(0,0,0,0.92); padding: 3px 3px 6px; }
-        .kb-row { display: flex; justify-content: center; gap: 2px; margin-bottom: 2px; }
-        .kb-key { flex: 1 1 0; max-width: 36px; padding: 5px 0; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: white; font-size: 10px; font-weight: bold; text-align: center; cursor: pointer; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
-        .kb-key:active { background: rgba(0,242,255,0.4); border-color: var(--neon-blue); }
-        .kb-nav { flex: 2 1 0; max-width: 90px; font-size: 9px; background: rgba(255,0,123,0.18); border-color: rgba(255,0,123,0.4); }
-        .kb-del { flex: 1.5 1 0; font-size: 13px; }
+        #kb-strip { position: fixed; left: 0; right: 0; bottom: 0; height: 52px; background: rgba(0,0,0,0.97); border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; z-index: 100; padding: 0 10px; gap: 8px; font-family: 'Roboto Mono', monospace; }
+        #kb-strip .kb-lane-btn { background: rgba(255,0,123,0.18); border: 1px solid rgba(255,0,123,0.4); color: white; padding: 9px 14px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer; touch-action: manipulation; font-family: 'Roboto Mono', monospace; min-width: 80px; }
+        #kb-strip .kb-type-btn { flex: 1; background: rgba(0,242,255,0.1); border: 1px solid rgba(0,242,255,0.3); color: var(--neon-blue); padding: 9px 10px; border-radius: 8px; font-size: 0.73rem; font-weight: 700; cursor: pointer; text-align: center; touch-action: manipulation; }
 
         @media (max-height: 500px) {
             button { padding: 9px 15px; margin: 5px 0; font-size: 0.8rem; }
@@ -98,13 +95,12 @@
             <button onclick="retryGame()">TRY AGAIN <span>[RETRY]</span></button>
             <a href="index.html" class="home-link">← Back to Arcade Hub</a>
         </div>
-        <div id="onscreen-kb" class="hidden">
-            <div class="kb-row"><div class="kb-key kb-nav" data-action="LEFT">◄ LANE</div><div class="kb-key kb-nav" data-action="RIGHT">LANE ►</div></div>
-            <div class="kb-row"><div class="kb-key" data-key="Q">Q</div><div class="kb-key" data-key="W">W</div><div class="kb-key" data-key="E">E</div><div class="kb-key" data-key="R">R</div><div class="kb-key" data-key="T">T</div><div class="kb-key" data-key="Y">Y</div><div class="kb-key" data-key="U">U</div><div class="kb-key" data-key="I">I</div><div class="kb-key" data-key="O">O</div><div class="kb-key" data-key="P">P</div></div>
-            <div class="kb-row"><div class="kb-key" data-key="A">A</div><div class="kb-key" data-key="S">S</div><div class="kb-key" data-key="D">D</div><div class="kb-key" data-key="F">F</div><div class="kb-key" data-key="G">G</div><div class="kb-key" data-key="H">H</div><div class="kb-key" data-key="J">J</div><div class="kb-key" data-key="K">K</div><div class="kb-key" data-key="L">L</div></div>
-            <div class="kb-row"><div class="kb-key" data-key="Z">Z</div><div class="kb-key" data-key="X">X</div><div class="kb-key" data-key="C">C</div><div class="kb-key" data-key="V">V</div><div class="kb-key" data-key="B">B</div><div class="kb-key" data-key="N">N</div><div class="kb-key" data-key="M">M</div><div class="kb-key kb-del" data-key="DEL">⌫</div></div>
-        </div>
     </div>
+</div>
+<div id="kb-strip" class="hidden">
+    <button class="kb-lane-btn" onclick="moveLeft()">◄ LANE</button>
+    <div class="kb-type-btn" onclick="document.getElementById('mobile-input').focus()">⌨️ Tap to Type</div>
+    <button class="kb-lane-btn" onclick="moveRight()">LANE ►</button>
 </div>
 <input id="mobile-input" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="characters">
 <script>
@@ -170,7 +166,7 @@
     }
 
     const mobileInput = document.getElementById('mobile-input');
-    const onscreenKb = document.getElementById('onscreen-kb');
+    const kbStrip = document.getElementById('kb-strip');
     const isMobile = 'ontouchstart' in window;
 
     // ── Sound Effects (Web Audio API) ──────────────────────
@@ -188,18 +184,15 @@
         else if (gameMode === 'REAL') attemptJump(key);
     });
 
-    onscreenKb.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        const t = e.target.closest('[data-key],[data-action]');
-        if (!t) return;
-        if (t.dataset.action === 'LEFT') { moveLeft(); return; }
-        if (t.dataset.action === 'RIGHT') { moveRight(); return; }
-        const key = t.dataset.key;
-        if (!key || gameState !== 'PLAYING') return;
-        if (key === 'DEL') { typedBuffer = typedBuffer.slice(0, -1); return; }
-        if (gameMode === 'WORD') attemptWordInput(key);
-        else if (gameMode === 'REAL') attemptJump(key);
-    }, { passive: false });
+    function updateKbPos() {
+        if (!isMobile || !window.visualViewport) return;
+        const vv = window.visualViewport;
+        kbStrip.style.bottom = Math.max(0, window.innerHeight - vv.height - vv.offsetTop) + 'px';
+    }
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', updateKbPos);
+        window.visualViewport.addEventListener('scroll', updateKbPos);
+    }
 
     // Touch Handling (Tap left side, right side, or center)
     canvas.addEventListener('touchstart', (e) => {
@@ -233,12 +226,12 @@
         obstacles = []; bonuses = []; player.lane = 1; gameState = 'PLAYING'; typedBuffer = ''; player.isJumping = false; player.jumpH = 0; 
         document.querySelectorAll('.overlay').forEach(m => m.classList.add('hidden'));
         lastTime = performance.now();
-        if (isMobile && (gameMode === 'REAL' || gameMode === 'WORD')) onscreenKb.classList.remove('hidden');
-        else onscreenKb.classList.add('hidden');
+        if (isMobile && (gameMode === 'REAL' || gameMode === 'WORD')) { kbStrip.classList.remove('hidden'); setTimeout(() => mobileInput.focus(), 350); }
+        else kbStrip.classList.add('hidden');
     }
 
     function retryGame() { startGame(gameMode); }
-    function stopGame() { gameState = 'START'; document.getElementById('menu-over').classList.add('hidden'); document.getElementById('menu-start').classList.remove('hidden'); onscreenKb.classList.add('hidden'); }
+    function stopGame() { gameState = 'START'; document.getElementById('menu-over').classList.add('hidden'); document.getElementById('menu-start').classList.remove('hidden'); kbStrip.classList.add('hidden'); }
   
     function update(dt) {
         if(gameState !== 'PLAYING') return;
@@ -274,7 +267,7 @@
                     const _hs = parseInt(localStorage.getItem(_hsKey) || '0');
                     const _newHS = score > _hs;
                     if (_newHS) localStorage.setItem(_hsKey, score);
-                    gameState = 'OVER'; document.getElementById('final-score').innerText = score; document.getElementById('menu-over').classList.remove('hidden'); onscreenKb.classList.add('hidden');
+                    gameState = 'OVER'; document.getElementById('final-score').innerText = score; document.getElementById('menu-over').classList.remove('hidden'); kbStrip.classList.add('hidden');
                     document.getElementById('hs-note').innerText = _newHS ? '🏆 NEW HIGH SCORE!' : 'Best: ' + _hs;
                     playCrash();
                     if (_newHS) setTimeout(playApplause, 500);

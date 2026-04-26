@@ -49,6 +49,21 @@
         .choice-card.reveal  { border-color: var(--green) !important; background: rgba(0,255,136,0.1) !important; }
         .choice-card.dim     { opacity: 0.35; }
 
+        #explain-panel {
+            position: absolute; bottom: 4%; left: 4%; right: 4%;
+            background: rgba(10,18,40,0.97); border: 1px solid rgba(255,160,0,0.4);
+            border-radius: 14px; padding: 10px 16px 12px;
+            z-index: 9; pointer-events: none;
+            font-size: clamp(0.58rem, 1.7vw, 0.76rem); line-height: 1.65;
+        }
+        #explain-panel .ep-title { font-size: 0.68rem; color: #ff8800; font-weight: 700; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+        .ep-row { display: flex; gap: 6px; align-items: baseline; }
+        .ep-tag { font-weight: 800; min-width: 64px; }
+        .ep-tag.correct { color: #00ff88; }
+        .ep-tag.wrong   { color: rgba(255,255,255,0.4); }
+        .ep-why { color: rgba(255,255,255,0.55); }
+        .ep-why.correct { color: #a3f0c6; }
+
         @keyframes pop   { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.1); } }
         @keyframes shake { 0%,100%{ transform:translateX(0); } 25%{ transform:translateX(-7px); } 75%{ transform:translateX(7px); } }
 
@@ -111,6 +126,11 @@
         </div>
     </div>
 
+    <div id="explain-panel" class="hidden">
+        <div class="ep-title">📚 Why?</div>
+        <div id="explain-content"></div>
+    </div>
+
     <div id="feedback" class="hidden"></div>
 
     <!-- Main Menu -->
@@ -166,6 +186,107 @@
         });
     }
 
+    // ── Explanations ─────────────────────────────────────────
+    // Keys match question sentence; each option maps to a short reason.
+    const EXPLAIN = {
+        "The book is ___ the table.":              { on:"✓ 'on' — for surfaces (rests on top).",in:"✗ 'in' — enclosed spaces, not flat surfaces.",at:"✗ 'at' — for specific points, not surfaces." },
+        "The cat is hiding ___ the box.":           { in:"✓ 'in' — inside an enclosed space.",on:"✗ 'on' — on top of a surface, not inside.",under:"✗ 'under' — below something, not inside it." },
+        "She lives ___ London.":                   { in:"✓ 'in' — cities and countries use 'in'.",at:"✗ 'at' — for specific addresses, not whole cities.",on:"✗ 'on' — for surfaces or days, not cities." },
+        "We met ___ the airport.":                 { at:"✓ 'at' — for specific meeting/arrival points.",in:"✗ 'in' — implies inside the building (less precise).",on:"✗ 'on' — for transport or surfaces, not buildings." },
+        "He was born ___ 1990.":                   { in:"✓ 'in' — for years, months, and longer periods.",on:"✗ 'on' — for specific dates/days, not years.",at:"✗ 'at' — for times of day, not years." },
+        "The match starts ___ 5 PM.":              { at:"✓ 'at' — for specific times of day.",in:"✗ 'in' — for general periods, not exact times.",on:"✗ 'on' — for days/dates, not clock times." },
+        "School is closed ___ Sunday.":            { on:"✓ 'on' — for days of the week.",at:"✗ 'at' — for times, not days of the week.",in:"✗ 'in' — for months/years, not days." },
+        "She works ___ a hospital.":               { in:"✓ 'in' — working inside a large institution.",at:"✗ 'at' — location point (less specific than 'in').",on:"✗ 'on' — for transport/surfaces, not workplaces." },
+        "He arrived ___ Monday morning.":          { on:"✓ 'on' — for days (including day + time-of-day).",at:"✗ 'at' — for times, not days of the week.",in:"✗ 'in' — for months/years, not specific days." },
+        "The dog is sleeping ___ the floor.":      { on:"✓ 'on' — resting on a surface.",in:"✗ 'in' — enclosed spaces, not flat surfaces.",at:"✗ 'at' — a specific point/location, not a surface." },
+        "They arrived ___ the station.":           { at:"✓ 'at' — a specific destination/arrival point.",in:"✗ 'in' — inside the building (less precise).",on:"✗ 'on' — for transport/surfaces, not buildings." },
+        "We will meet ___ noon.":                  { at:"✓ 'at' — for precise times (noon, midnight, etc.).",in:"✗ 'in' — for time periods (morning/afternoon), not exact times.",on:"✗ 'on' — for days, not specific clock times." },
+        "The picture is hanging ___ the wall.":    { on:"✓ 'on' — objects attached to or resting on a surface.",in:"✗ 'in' — enclosed spaces, not flat surfaces.",at:"✗ 'at' — a specific point; walls are surfaces." },
+        "She sat ___ the front row.":              { in:"✓ 'in' — for rows and organised groups.",at:"✗ 'at' — for a single seat/point, not a whole row.",on:"✗ 'on' — for surfaces, not rows." },
+        "He is standing ___ the door.":            { at:"✓ 'at' — at a specific position/point.",in:"✗ 'in' — inside a room, not at its entrance.",on:"✗ 'on' — for surfaces, not doorways." },
+        "She walked ___ the bridge.":              { across:"✓ 'across' — from one side to the other of a surface.",through:"✗ 'through' — entering/exiting an enclosed space.",over:"✗ 'over' — above something without touching it." },
+        "The train goes ___ the tunnel.":          { through:"✓ 'through' — inside and all along an enclosed passage.",across:"✗ 'across' — side-to-side on open surface, not enclosed.",over:"✗ 'over' — above something; trains go inside tunnels." },
+        "He jumped ___ the fence.":                { over:"✓ 'over' — above and past an obstacle.",through:"✗ 'through' — entering/exiting (e.g. a gap); fences are solid.",across:"✗ 'across' — side-to-side motion, not upward." },
+        "She has studied here ___ two years.":     { for:"✓ 'for' + duration (a length of time).",since:"✗ 'since' + starting point, not a duration.",during:"✗ 'during' + a named period, not a bare number." },
+        "They have been friends ___ childhood.":   { since:"✓ 'since' — from a past point/event up to now.",for:"✗ 'for' — a duration of time, not a starting point.",during:"✗ 'during' — within a period, not from its start to now." },
+        "He fell asleep ___ the lecture.":         { during:"✓ 'during' — at some point within a named event.",for:"✗ 'for' — a length of time, not within a named event.",since:"✗ 'since' — from a past point, not within an event." },
+        "The bird flew ___ the open window.":      { through:"✓ 'through' — entering one side and exiting the other.",across:"✗ 'across' — side-to-side, not via a narrow opening.",into:"✗ 'into' — entering only; 'through' implies exiting too." },
+        "She drove ___ the countryside.":          { through:"✓ 'through' — travelling within/inside an area.",across:"✗ 'across' — edge to edge; 'through' shows being inside.",around:"✗ 'around' — circling it, not passing through." },
+        "They sailed ___ the lake.":               { across:"✓ 'across' — from one bank/shore to the opposite.",around:"✗ 'around' — circling the lake, not crossing it.",through:"✗ 'through' — for enclosed spaces; lakes are open water." },
+        "He has lived here ___ 2015.":             { since:"✓ 'since' — from a specific year to now.",for:"✗ 'for' — a duration (e.g. for 8 years), not a year.",during:"✗ 'during' — within a named period, not from a start year." },
+        "She has been waiting ___ an hour.":       { for:"✓ 'for' — how long (a duration of time).",since:"✗ 'since' — a starting point, not a length of time.",during:"✗ 'during' — within a named event, not a bare duration." },
+        "The soldiers marched ___ the bridge.":    { across:"✓ 'across' — from one side to the other of a surface.",through:"✗ 'through' — for enclosed spaces; bridges are open.",over:"✗ 'over' — above; marching is on the bridge surface." },
+        "He swam ___ the river to the other side.":{ across:"✓ 'across' — from one bank to the opposite bank.",through:"✗ 'through' — for enclosed spaces, not open-water crossings.",over:"✗ 'over' — above a surface; swimming is in the water." },
+        "She peeked ___ a gap in the curtain.":    { through:"✓ 'through' — looking via an opening from one side to the other.",into:"✗ 'into' — entering a space; she is only looking, not entering.",across:"✗ 'across' — side-to-side on a surface, not via a gap." },
+        "They didn't speak ___ the movie.":        { during:"✓ 'during' — within the time of a named event.",for:"✗ 'for' — a duration; 'during the movie' is idiomatic.",since:"✗ 'since' — from a past point, not within an event." },
+        "The painting hangs ___ the fireplace.":   { above:"✓ 'above' — higher than, without directly covering it.",over:"✗ 'over' — directly covering or spanning; 'above' is more precise here.",beside:"✗ 'beside' — next to (same level), not higher up." },
+        "She sat ___ her two friends.":            { between:"✓ 'between' — in the middle of exactly two people.",among:"✗ 'among' — used with three or more people.",beside:"✗ 'beside' — next to one person, not in the middle of two." },
+        "The secret was shared ___ all of them.":  { among:"✓ 'among' — shared within a group of three or more.",between:"✗ 'between' — for exactly two; 'all of them' is a larger group.",within:"✗ 'within' — inside limits/boundaries, not shared in a group." },
+        "He acted ___ thinking twice.":            { without:"✓ 'without' — in the complete absence of something.",despite:"✗ 'despite' — in spite of (contrast), not absence.",against:"✗ 'against' — in opposition to, not the absence of." },
+        "They won ___ all the odds.":              { against:"✓ 'against' — in direct opposition to unfavourable odds.",despite:"✗ 'despite' — needs 'despite all odds' (noun phrase) which is also valid, but 'against all odds' is the fixed idiom.",without:"✗ 'without' — absence of something, not opposition." },
+        "She succeeded ___ all difficulties.":     { despite:"✓ 'despite' — she succeeded even though difficulties existed.",without:"✗ 'without' — would mean no difficulties existed (opposite meaning!).",against:"✗ 'against' — in opposition; 'despite' is correct for overcoming." },
+        "He spoke ___ great confidence.":          { with:"✓ 'with' — shows accompanying quality or manner.",in:"✗ 'in' — for language/voice tone ('in a loud voice'), not confidence.",by:"✗ 'by' — means or agent, not an accompanying manner." },
+        "The results will be known ___ a week.":   { within:"✓ 'within' — at some point before the end of the period.",in:"✗ 'in' — exactly at the end of the period, not any time before.",after:"✗ 'after' — following the period, not during it." },
+        "They walked ___ the old river road.":     { along:"✓ 'along' — following the length/direction of a path.",beside:"✗ 'beside' — next to it, not moving in its direction.",through:"✗ 'through' — for enclosed spaces, not open roads." },
+        "She is standing just ___ the door.":      { behind:"✓ 'behind' — at the back of something.",beside:"✗ 'beside' — side by side, not at the back.",near:"✗ 'near' — vague proximity; 'just behind' is more specific." },
+        "He completed the task ___ the deadline.":  { before:"✓ 'before' — earlier than the deadline.",after:"✗ 'after' — later than the deadline (opposite meaning!).",within:"✗ 'within' — inside a period; 'within a deadline' is non-standard." },
+        "The note was written ___ a blue pen.":    { with:"✓ 'with' — the instrument or tool used.",by:"✗ 'by' — the person who wrote it, not the tool.",in:"✗ 'in' — for colour of ink ('written in blue') not the pen itself." },
+        "She replied ___ a warm smile.":           { with:"✓ 'with' — an accompanying expression or manner.",by:"✗ 'by' — method/means, not an accompanying expression.",in:"✗ 'in' — for language or voice tone, not physical expressions." },
+        "He was punished ___ his mistake.":        { for:"✓ 'for' — the reason or cause of the punishment.",because:"✗ 'because' — a conjunction needing a full clause after it.","due to":"✗ 'due to' — causal but 'punished for' is the standard collocation." },
+        "They disagreed ___ each other.":          { with:"✓ 'disagree with' is the fixed verb-preposition collocation.",against:"✗ 'against' — general opposition; 'disagree with' is the idiom.",between:"✗ 'between' — shows position or relationship, not disagreement." },
+        // ── 50 new questions ──────────────────────────────────
+        "The cat sat ___ the mat.":                    {on:"✓ 'on' — for surfaces (resting on top).",in:"✗ 'in' — enclosed spaces, not flat surfaces.",at:"✗ 'at' — a specific point, not a surface."},
+        "He put the letter ___ the envelope.":          {in:"✓ 'in' — inside an enclosed container.",on:"✗ 'on' — for surfaces, not inside containers.",at:"✗ 'at' — a specific point, not inside something."},
+        "She is waiting ___ the bus stop.":             {at:"✓ 'at' — for a specific waiting/meeting point.",on:"✗ 'on' — for transport or surfaces, not stops.",in:"✗ 'in' — enclosed spaces; a bus stop is an open point."},
+        "The shop is closed ___ Christmas Day.":        {on:"✓ 'on' — for specific named days.",at:"✗ 'at' — for times of day, not named days.",in:"✗ 'in' — for months or years, not specific days."},
+        "She was born ___ July.":                       {in:"✓ 'in' — for months, years, and seasons.",on:"✗ 'on' — for specific calendar dates, not months.",at:"✗ 'at' — for times of day, not months."},
+        "He knocked ___ the door.":                     {on:"✓ 'knock on' is the standard fixed collocation.",at:"✗ 'at' — used informally with door area; 'on' is the standard form.",in:"✗ 'in' — implies being inside, not striking a surface."},
+        "There is a crack ___ the ceiling.":            {in:"✓ 'in' — a crack is a gap/fissure inside a surface.",on:"✗ 'on' — for things attached to a surface, not gaps within it.",at:"✗ 'at' — for specific points/locations, not gaps."},
+        "The children play ___ the garden daily.":      {in:"✓ 'in' — inside an enclosed or defined area.",at:"✗ 'at' — for a specific point, not an area to play within.",on:"✗ 'on' — for surfaces, not defined outdoor areas."},
+        "I read about it ___ the newspaper.":           {in:"✓ 'in' — content found inside a printed publication.",on:"✗ 'on' — for digital platforms ('on a website'), not print.",at:"✗ 'at' — for locations or times, not publications."},
+        "She is very good ___ painting.":               {at:"✓ 'good at' is the fixed collocation for skills/activities.",in:"✗ 'good in' is sometimes used for subjects but 'at' is standard for skills.",on:"✗ 'good on' is not a standard collocation for skills."},
+        "He lives ___ the third floor.":                {on:"✓ 'on' — floor levels always use 'on'.",in:"✗ 'in' — for enclosed spaces, not floor levels.",at:"✗ 'at' — for specific addresses, not floor numbers."},
+        "They met ___ the conference.":                 {at:"✓ 'at' — for specific events and gathering points.",in:"✗ 'in' — 'at' is preferred for events; 'in' just says inside the building.",on:"✗ 'on' — for surfaces or transport, not events."},
+        "I will call you ___ the evening.":             {in:"✓ 'in' — for parts of the day (morning, afternoon, evening).",at:"✗ 'at' — for specific times (at 6 PM), not general parts of the day.",on:"✗ 'on' — for days/dates, not parts of the day."},
+        "She was ___ school when it happened.":         {at:"✓ 'at school' — engaged in school (the most natural phrase).",in:"✗ 'in school' is used but 'at school' is more idiomatic in standard English.",on:"✗ 'on' — not used with institutions like school."},
+        "The kids were already ___ bed.":               {in:"✓ 'in bed' — the fixed phrase meaning under the covers, asleep.",on:"✗ 'on the bed' — on top of the bedcovers, not the same as sleeping.",at:"✗ 'at bed' — not standard English."},
+        "He is the best student ___ the class.":        {in:"✓ 'in the class' — among those who belong to the class group.",at:"✗ 'best at' means most skilled at something, not class membership.",on:"✗ 'on' — not used for class membership."},
+        "The match was played ___ a rainy evening.":    {on:"✓ 'on' — for specific occasions/events with descriptors.",in:"✗ 'in the evening' is general; 'on a rainy evening' marks a specific occasion.",at:"✗ 'at' — for times of day, not whole occasion descriptions."},
+        "She walked ___ the room and took her seat.":   {into:"✓ 'into' — entering from outside to inside.",in:"✗ 'in' — static position inside (not the act of entering).",through:"✗ 'through' — entering and exiting the other side, not just entering."},
+        "The car sped ___ the speed camera.":           {past:"✓ 'past' — moving beyond a point without stopping.",through:"✗ 'through' — for enclosed spaces; cameras are open-road points.",by:"✗ 'by' — can imply passing but 'past' is more specific for speeding movement."},
+        "The report must be submitted ___ Friday.":     {by:"✓ 'by' — a deadline: must be done no later than that time.",on:"✗ 'on' — a specific day; doesn't carry the 'no later than' meaning.",until:"✗ 'until' — continuous action up to a point, not a one-time deadline."},
+        "She waited ___ closing time.":                 {until:"✓ 'until' — a continuous state/action right up to a specific time.",by:"✗ 'by' — a deadline for completing something, not continuous waiting.",for:"✗ 'for' — a duration (for two hours), not up to a specific named time."},
+        "He turned ___ the camera and smiled.":         {towards:"✓ 'towards' — facing or moving in the direction of something.",to:"✗ 'to' — implies arrival at a destination; turning is about direction, not arrival.",against:"✗ 'against' — in opposition; not a direction of facing."},
+        "The explorers went ___ the known world.":      {beyond:"✓ 'beyond' — further than or outside the limits of something.",past:"✗ 'past' — going by a point; 'beyond' implies surpassing limits entirely.",through:"✗ 'through' — passing within an area, not past its outer limits."},
+        "The cat jumped ___ the table from the chair.": {onto:"✓ 'onto' — movement resulting in being on top of a surface.",on:"✗ 'on' — a static position; 'onto' shows the motion towards a surface.",over:"✗ 'over' — clearing above it without landing on top."},
+        "The ball rolled ___ the table.":               {off:"✓ 'off' — movement away from and leaving a surface.",from:"✗ 'from' — shows origin but not the act of detaching from a surface.",out:"✗ 'out' — exiting an enclosed space, not falling from a surface."},
+        "She climbed ___ the ladder to fix the roof.":  {up:"✓ 'up' — moving in an upward direction on/along something.",on:"✗ 'on' — being on the ladder (static position), not moving upwards.",over:"✗ 'over' — above or clearing something, not ascending."},
+        "They gathered ___ the bonfire for warmth.":    {around:"✓ 'around' — encircling on all sides.",near:"✗ 'near' — close to, but not necessarily encircling all sides.",by:"✗ 'by' — beside/next to one side, not surrounding."},
+        "She is very excited ___ the school trip.":     {about:"✓ 'excited about' is the fixed collocation for emotions.",for:"✗ 'for' — purpose ('she left for the trip'), not emotional response.",of:"✗ 'excited of' is non-standard English."},
+        "He complained ___ the noise outside.":         {about:"✓ 'complained about' — the standard collocation for general complaints.",of:"✗ 'complained of' — used for physical symptoms ('complained of pain'), not noise.",for:"✗ 'complained for' is not standard grammar."},
+        "She swam ___ the buoy and turned back.":       {past:"✓ 'past' — moving beyond a specific marker point.",through:"✗ 'through' — for enclosed spaces; a buoy is an open-water marker.",over:"✗ 'over' — above a surface; she is swimming at buoy level."},
+        "She has been practising piano ___ a week.":    {for:"✓ 'for' + duration (a length of time).",since:"✗ 'since' + a starting point, not a bare number/duration.",during:"✗ 'during' + a named period/event, not a bare number."},
+        "She poured water ___ the glass slowly.":       {into:"✓ 'into' — movement from outside to inside a container.",in:"✗ 'in' — static position inside, not the motion of pouring.",through:"✗ 'through' — entering and exiting; liquid stays in the glass."},
+        "He has been on the team ___ last year.":       {since:"✓ 'since' — from a past point right up to now.",for:"✗ 'for' — a duration (for a year), not a starting point like 'last year'.",during:"✗ 'during' — within a period, not from a starting point to now."},
+        "The teacher spoke ___ the whole lesson.":      {throughout:"✓ 'throughout' — for the entire period without interruption.",during:"✗ 'during' — at some point within (doesn't mean the whole time).",for:"✗ 'for' — a bare duration; 'throughout' emphasises the complete unbroken span."},
+        "The letter was signed ___ the headmaster.":    {by:"✓ 'by' — passive agent: the person who performed the action.",from:"✗ 'from' — origin/source of something, not the doer of a passive action.",with:"✗ 'with' — the instrument used, not the person who performed the action."},
+        "The statue is made ___ solid bronze.":         {of:"✓ 'made of' — composition (the original material is still identifiable).",from:"✗ 'made from' — used when raw material is transformed ('glass from sand').",with:"✗ 'with' — the tool/means of making, not the material it is composed of."},
+        "She was elected ___ a large majority.":        {by:"✓ 'by' — measure or means of an outcome ('elected by a majority').",with:"✗ 'with' — accompaniment/manner, not a measure of election margin.",in:"✗ 'in' — context or setting, not a measure of a voting result."},
+        "The box is full ___ old photographs.":         {of:"✓ 'full of' is the fixed collocation.",with:"✗ 'full with' is non-standard; 'filled with' is correct but not 'full with'.",from:"✗ 'from' — origin/source, not the contents of a container."},
+        "She is interested ___ marine biology.":        {in:"✓ 'interested in' is the fixed collocation.",at:"✗ 'interested at' is not standard English.",about:"✗ 'interested about' is non-standard; use 'curious about' or 'interested in'."},
+        "He is disappointed ___ his test result.":      {with:"✓ 'disappointed with' — standard for outcomes/objects.",about:"✗ 'disappointed about' — used for situations/events, not results.",by:"✗ 'disappointed by' — used for a person's actions, not a test result."},
+        "She apologised ___ arriving late.":            {for:"✓ 'apologised for' + gerund is the fixed collocation.",about:"✗ 'apologised about' is informal; 'for' is the grammatically correct form.",to:"✗ 'apologised to' shows who received the apology, not what it was for."},
+        "He succeeded ___ passing the exam.":           {in:"✓ 'succeeded in' + gerund is the fixed collocation.",at:"✗ 'succeeded at' is informal; 'in' is the grammatically standard form.",with:"✗ 'succeeded with' is not standard grammar."},
+        "The play was enjoyed ___ the entire audience.": {by:"✓ 'by' — passive voice agent (who did the enjoying).",from:"✗ 'from' — origin/source, not the agent of a passive verb.",with:"✗ 'with' — instrument/manner, not a passive agent."},
+        "She differs ___ her sister in personality.":   {from:"✓ 'differs from' is the fixed collocation.",with:"✗ 'differs with' means 'disagrees with', not 'is different from'.",to:"✗ 'differs to' is non-standard; 'from' is always correct here."},
+        "He was accused ___ cheating in the test.":     {of:"✓ 'accused of' is the fixed collocation.",for:"✗ 'accused for' is non-standard; 'of' is always used.",with:"✗ 'accused with' is not standard grammar."},
+        "She is capable ___ doing much better.":        {of:"✓ 'capable of' is the fixed collocation.",for:"✗ 'capable for' is non-standard.",at:"✗ 'capable at' is also non-standard; only 'of' is used here."},
+        "He was proud ___ his achievement.":            {of:"✓ 'proud of' is the fixed collocation.",about:"✗ 'proud about' is sometimes heard but 'of' is grammatically standard.",for:"✗ 'proud for' is not standard grammar."},
+        "She is afraid ___ the dark.":                  {of:"✓ 'afraid of' is the fixed collocation.",from:"✗ 'afraid from' is not standard English.",about:"✗ 'afraid about' is sometimes used but 'of' is always correct here."},
+        "He was grateful ___ their kindness.":          {for:"✓ 'grateful for' is the fixed collocation.",of:"✗ 'grateful of' is non-standard; 'for' is always required.",about:"✗ 'grateful about' is not standard grammar."},
+        "She is responsible ___ the mistake.":          {for:"✓ 'responsible for' is the fixed collocation.",of:"✗ 'responsible of' is not standard grammar.",about:"✗ 'responsible about' means careful/diligent, not accountable."},
+    };
+
     // ── Question Bank ─────────────────────────────────────────
     const QUESTIONS = {
         easy: [
@@ -184,6 +305,23 @@
             { s: "The picture is hanging ___ the wall.",    a: "on",     w: ["in", "at"] },
             { s: "She sat ___ the front row.",              a: "in",     w: ["at", "on"] },
             { s: "He is standing ___ the door.",            a: "at",     w: ["in", "on"] },
+            { s: "The cat sat ___ the mat.",                    a: "on",       w: ["in", "at"] },
+            { s: "He put the letter ___ the envelope.",          a: "in",       w: ["on", "at"] },
+            { s: "She is waiting ___ the bus stop.",             a: "at",       w: ["on", "in"] },
+            { s: "The shop is closed ___ Christmas Day.",        a: "on",       w: ["at", "in"] },
+            { s: "She was born ___ July.",                       a: "in",       w: ["on", "at"] },
+            { s: "He knocked ___ the door.",                     a: "on",       w: ["at", "in"] },
+            { s: "There is a crack ___ the ceiling.",            a: "in",       w: ["on", "at"] },
+            { s: "The children play ___ the garden daily.",      a: "in",       w: ["at", "on"] },
+            { s: "I read about it ___ the newspaper.",           a: "in",       w: ["on", "at"] },
+            { s: "She is very good ___ painting.",               a: "at",       w: ["in", "on"] },
+            { s: "He lives ___ the third floor.",                a: "on",       w: ["in", "at"] },
+            { s: "They met ___ the conference.",                 a: "at",       w: ["in", "on"] },
+            { s: "I will call you ___ the evening.",             a: "in",       w: ["at", "on"] },
+            { s: "She was ___ school when it happened.",         a: "at",       w: ["in", "on"] },
+            { s: "The kids were already ___ bed.",               a: "in",       w: ["on", "at"] },
+            { s: "He is the best student ___ the class.",        a: "in",       w: ["at", "on"] },
+            { s: "The match was played ___ a rainy evening.",    a: "on",       w: ["in", "at"] },
         ],
         medium: [
             { s: "She walked ___ the bridge.",              a: "across",  w: ["through", "over"] },
@@ -201,6 +339,23 @@
             { s: "He swam ___ the river to the other side.",a: "across",  w: ["through", "over"] },
             { s: "She peeked ___ a gap in the curtain.",    a: "through", w: ["into", "across"] },
             { s: "They didn't speak ___ the movie.",        a: "during",  w: ["for", "since"] },
+            { s: "She walked ___ the room and took her seat.",   a: "into",     w: ["in", "through"] },
+            { s: "The car sped ___ the speed camera.",           a: "past",     w: ["through", "by"] },
+            { s: "The report must be submitted ___ Friday.",     a: "by",       w: ["on", "until"] },
+            { s: "She waited ___ closing time.",                 a: "until",    w: ["by", "for"] },
+            { s: "He turned ___ the camera and smiled.",         a: "towards",  w: ["to", "against"] },
+            { s: "The explorers went ___ the known world.",      a: "beyond",   w: ["past", "through"] },
+            { s: "The cat jumped ___ the table from the chair.", a: "onto",     w: ["on", "over"] },
+            { s: "The ball rolled ___ the table.",               a: "off",      w: ["from", "out"] },
+            { s: "She climbed ___ the ladder to fix the roof.",  a: "up",       w: ["on", "over"] },
+            { s: "They gathered ___ the bonfire for warmth.",    a: "around",   w: ["near", "by"] },
+            { s: "She is very excited ___ the school trip.",     a: "about",    w: ["for", "of"] },
+            { s: "He complained ___ the noise outside.",         a: "about",    w: ["of", "for"] },
+            { s: "She swam ___ the buoy and turned back.",       a: "past",     w: ["through", "over"] },
+            { s: "She has been practising piano ___ a week.",    a: "for",      w: ["since", "during"] },
+            { s: "She poured water ___ the glass slowly.",       a: "into",     w: ["in", "through"] },
+            { s: "He has been on the team ___ last year.",       a: "since",    w: ["for", "during"] },
+            { s: "The teacher spoke ___ the whole lesson.",      a: "throughout", w: ["during", "for"] },
         ],
         hard: [
             { s: "The painting hangs ___ the fireplace.",   a: "above",   w: ["over", "beside"] },
@@ -218,6 +373,22 @@
             { s: "She replied ___ a warm smile.",           a: "with",    w: ["by", "in"] },
             { s: "He was punished ___ his mistake.",        a: "for",     w: ["because", "due to"] },
             { s: "They disagreed ___ each other.",          a: "with",    w: ["against", "between"] },
+            { s: "The letter was signed ___ the headmaster.",    a: "by",       w: ["from", "with"] },
+            { s: "The statue is made ___ solid bronze.",         a: "of",       w: ["from", "with"] },
+            { s: "She was elected ___ a large majority.",        a: "by",       w: ["with", "in"] },
+            { s: "The box is full ___ old photographs.",         a: "of",       w: ["with", "from"] },
+            { s: "She is interested ___ marine biology.",        a: "in",       w: ["at", "about"] },
+            { s: "He is disappointed ___ his test result.",      a: "with",     w: ["about", "by"] },
+            { s: "She apologised ___ arriving late.",            a: "for",      w: ["about", "to"] },
+            { s: "He succeeded ___ passing the exam.",           a: "in",       w: ["at", "with"] },
+            { s: "The play was enjoyed ___ the entire audience.", a: "by",      w: ["from", "with"] },
+            { s: "She differs ___ her sister in personality.",   a: "from",     w: ["with", "to"] },
+            { s: "He was accused ___ cheating in the test.",     a: "of",       w: ["for", "with"] },
+            { s: "She is capable ___ doing much better.",        a: "of",       w: ["for", "at"] },
+            { s: "He was proud ___ his achievement.",            a: "of",       w: ["about", "for"] },
+            { s: "She is afraid ___ the dark.",                  a: "of",       w: ["from", "about"] },
+            { s: "He was grateful ___ their kindness.",          a: "for",      w: ["of", "about"] },
+            { s: "She is responsible ___ the mistake.",          a: "for",      w: ["of", "about"] },
         ]
     };
 
@@ -264,6 +435,21 @@
         el._t = setTimeout(() => el.classList.add('hidden'), 900);
     }
 
+    function showExplanation() {
+        const exp = EXPLAIN[currentQ.s];
+        if (!exp) return;
+        const content = document.getElementById('explain-content');
+        content.innerHTML = opts.map(opt => {
+            const isCorrect = opt === currentQ.a;
+            const reason = exp[opt] || '';
+            return `<div class="ep-row">
+                <span class="ep-tag ${isCorrect ? 'correct' : 'wrong'}">${isCorrect ? '✓' : '✗'} <b>${opt}</b></span>
+                <span class="ep-why ${isCorrect ? 'correct' : ''}">${reason.replace(/^[✓✗] '\w[^']*' ?[—-]? ?/, '')}</span>
+            </div>`;
+        }).join('');
+        document.getElementById('explain-panel').classList.remove('hidden');
+    }
+
     // ── Timer ─────────────────────────────────────────────────
     function startTimer() {
         timerStart = performance.now();
@@ -290,9 +476,10 @@
             c.classList.add(opts[i] === currentQ.a ? 'reveal' : 'dim');
             c.style.pointerEvents = 'none';
         }
+        showExplanation();
         lives--; document.getElementById('lives-display').innerHTML = livesHTML(lives);
-        if (lives <= 0) setTimeout(() => endGame(false), 1100);
-        else setTimeout(nextQuestion, 1200);
+        if (lives <= 0) setTimeout(() => endGame(false), 1700);
+        else setTimeout(nextQuestion, 1800);
     }
 
     // ── Question Loading ──────────────────────────────────────
@@ -307,6 +494,7 @@
             c.className = 'choice-card'; c.style.opacity = '1'; c.style.pointerEvents = 'all';
         });
         document.getElementById('q-counter').textContent = `Q ${qIndex + 1}/${qList.length}`;
+        document.getElementById('explain-panel').classList.add('hidden');
         timerDuration = Math.max(5000, (currentMode === 'easy' ? 14000 : currentMode === 'medium' ? 11000 : 9000) - qIndex * 150);
         startTimer();
     }
@@ -341,8 +529,9 @@
             flashScreen('rgba(255,75,75,0.4)');
             showFeedback('✗ Wrong!  Answer: ' + currentQ.a, '#ff6b6b');
             playWrong();
-            if (lives <= 0) setTimeout(() => endGame(false), 1000);
-            else setTimeout(nextQuestion, 1100);
+            showExplanation();
+            if (lives <= 0) setTimeout(() => endGame(false), 1700);
+            else setTimeout(nextQuestion, 1800);
         }
     }
 
