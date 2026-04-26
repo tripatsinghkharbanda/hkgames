@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Prep Quest</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #00f2ff; --secondary: #7000ff; --green: #00ff88; --red: #ff4b4b; --bg: #0f172a; --glass: rgba(255,255,255,0.08); }
+        * { touch-action: manipulation; -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: var(--bg); font-family: 'Poppins', sans-serif; color: white; overflow: hidden; }
+
+        #game-container { position: relative; width: 100%; max-width: 900px; aspect-ratio: 9/5; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6); }
+        canvas { width: 100%; height: 100%; display: block; }
+        .hidden { display: none !important; }
+
+        /* HUD */
+        #hud { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; align-items: center; padding: 7px 15px; background: var(--glass); border-radius: 12px; font-size: 0.8rem; font-weight: 700; z-index: 5; pointer-events: none; gap: 12px; }
+        #hud .stat span { color: var(--primary); }
+        #lives-display { color: #ff4b6e; letter-spacing: 2px; font-size: 0.95rem; }
+        #timer-wrap { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: center; }
+        #timer-label { font-size: 0.65rem; color: #94a3b8; white-space: nowrap; }
+        #timer-bar-bg { flex: 1; max-width: 160px; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
+        #timer-bar { height: 100%; border-radius: 4px; background: var(--primary); width: 100%; transition: background 0.3s; }
+        #q-counter { font-size: 0.7rem; color: #94a3b8; white-space: nowrap; }
+
+        /* Question zone */
+        #question-zone { position: absolute; top: 55px; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 4; pointer-events: none; gap: 20px; padding: 10px 20px; }
+
+        #sentence-wrap { background: rgba(15,23,42,0.85); border: 1.5px solid rgba(0,242,255,0.3); border-radius: 16px; padding: 14px 28px; max-width: 88%; text-align: center; }
+        #sentence-text { font-size: clamp(0.8rem, 2.8vw, 1.15rem); font-weight: 600; line-height: 1.7; }
+        #sentence-text .blank { color: var(--primary); font-size: 1.2em; font-weight: 900; letter-spacing: 3px; border-bottom: 2px solid var(--primary); }
+        #sentence-text .filled { color: var(--green); font-weight: 900; }
+
+        #choices { display: flex; gap: 12px; pointer-events: all; flex-wrap: wrap; justify-content: center; }
+        .choice-card {
+            position: relative; min-width: 100px; padding: 13px 22px; text-align: center;
+            background: rgba(255,255,255,0.09); border: 2px solid rgba(255,255,255,0.18);
+            border-radius: 14px; font-size: 1.05rem; font-weight: 700; cursor: pointer;
+            transition: transform 0.12s, border-color 0.15s, background 0.15s;
+            user-select: none; outline: none;
+        }
+        .choice-card:hover { border-color: var(--primary); background: rgba(0,242,255,0.12); transform: translateY(-3px); }
+        .choice-card:active { transform: scale(0.95); }
+        .choice-card .key-hint { position: absolute; top: 4px; right: 7px; font-size: 8px; color: rgba(255,255,255,0.3); font-weight: 400; }
+        .choice-card.correct { border-color: var(--green) !important; background: rgba(0,255,136,0.18) !important; animation: pop 0.35s ease; }
+        .choice-card.wrong   { border-color: var(--red) !important; background: rgba(255,75,75,0.18) !important; animation: shake 0.35s ease; }
+        .choice-card.reveal  { border-color: var(--green) !important; background: rgba(0,255,136,0.1) !important; }
+        .choice-card.dim     { opacity: 0.35; }
+
+        @keyframes pop   { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.1); } }
+        @keyframes shake { 0%,100%{ transform:translateX(0); } 25%{ transform:translateX(-7px); } 75%{ transform:translateX(7px); } }
+
+        /* Feedback message */
+        #feedback { position: absolute; top: 58%; left: 50%; transform: translateX(-50%); font-size: clamp(0.8rem,2.5vw,1rem); font-weight: 700; padding: 6px 18px; border-radius: 20px; z-index: 6; pointer-events: none; white-space: nowrap; }
+
+        /* Score popup */
+        .score-pop { position: absolute; font-size: 1.3rem; font-weight: 900; pointer-events: none; z-index: 7; animation: float-up 0.85s ease-out forwards; }
+        @keyframes float-up { 0%{ opacity:1; transform:translateY(0) translateX(-50%); } 100%{ opacity:0; transform:translateY(-55px) translateX(-50%); } }
+
+        /* Flash overlay */
+        #flash { position: absolute; inset: 0; z-index: 8; pointer-events: none; opacity: 0; }
+
+        /* Menus */
+        .ui-layer { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(15,23,42,0.96); backdrop-filter: blur(10px); z-index: 10; padding: 14px 22px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        h1 { font-size: clamp(1.5rem, 8vw, 2.8rem); margin-bottom: 0.3rem; background: linear-gradient(to right, var(--primary), #a855f7); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; text-transform: uppercase; text-align: center; }
+        .sub { color: #94a3b8; text-align: center; margin-bottom: 0.9rem; font-size: 0.85rem; }
+        .menu-option { padding: 12px 22px; margin: 6px; font-size: 15px; font-weight: 700; background: var(--glass); color: white; border: 2px solid rgba(255,255,255,0.1); border-radius: 12px; width: 90%; max-width: 360px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; outline: none; transition: border-color 0.2s, background 0.2s; }
+        .menu-option:hover, .menu-option:focus { border-color: var(--primary); background: rgba(0,242,255,0.08); }
+        .key-prompt { background: white; color: black; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+        .home-link { display: inline-block; margin-top: 16px; font-size: 0.72rem; font-weight: 600; letter-spacing: 1px; color: rgba(255,255,255,0.3); text-decoration: none; text-transform: uppercase; transition: color 0.2s; }
+        .home-link:hover { color: rgba(255,255,255,0.7); }
+
+        @media (max-width: 480px) {
+            h1 { font-size: 1.3rem !important; }
+            #sentence-text { font-size: 0.75rem; }
+            .choice-card { min-width: 76px; padding: 10px 12px; font-size: 0.9rem; }
+            #choices { gap: 7px; }
+            .menu-option { padding: 8px 14px; font-size: 13px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas" width="900" height="500"></canvas>
+
+    <div id="flash"></div>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+        <div class="stat">SCORE: <span id="score-val">0</span></div>
+        <div id="timer-wrap">
+            <span id="timer-label">TIME</span>
+            <div id="timer-bar-bg"><div id="timer-bar"></div></div>
+        </div>
+        <div id="q-counter">Q 1/12</div>
+        <div id="lives-display">❤️❤️❤️</div>
+    </div>
+
+    <!-- Question + Choices -->
+    <div id="question-zone" class="hidden">
+        <div id="sentence-wrap">
+            <div id="sentence-text"></div>
+        </div>
+        <div id="choices">
+            <div class="choice-card" id="c0" tabindex="0"><span class="key-hint">1</span><span class="ct"></span></div>
+            <div class="choice-card" id="c1" tabindex="0"><span class="key-hint">2</span><span class="ct"></span></div>
+            <div class="choice-card" id="c2" tabindex="0"><span class="key-hint">3</span><span class="ct"></span></div>
+        </div>
+    </div>
+
+    <div id="feedback" class="hidden"></div>
+
+    <!-- Main Menu -->
+    <div id="main-menu" class="ui-layer">
+        <h1>Prep Quest</h1>
+        <p class="sub">Grade 7 Prepositions — Fill in the blank correctly!</p>
+        <div class="menu-option" tabindex="0" onclick="startGame('easy')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startGame('easy');}">
+            <span>🟢 Easy &nbsp;(Place &amp; Time)</span><span class="key-prompt">1</span>
+        </div>
+        <div class="menu-option" tabindex="0" onclick="startGame('medium')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startGame('medium');}">
+            <span>🟡 Medium (Direction &amp; Duration)</span><span class="key-prompt">2</span>
+        </div>
+        <div class="menu-option" tabindex="0" onclick="startGame('hard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startGame('hard');}">
+            <span>🔴 Hard &nbsp;(Mixed Advanced)</span><span class="key-prompt">3</span>
+        </div>
+        <a href="index.html" class="home-link">← Back to Arcade Hub</a>
+    </div>
+
+    <!-- Game Over -->
+    <div id="game-over" class="ui-layer hidden">
+        <h1 id="end-title" style="-webkit-text-fill-color:white;color:white;">GAME OVER</h1>
+        <p id="final-score" class="sub">Score: 0</p>
+        <p id="hs-note" style="color:#ffd700;font-size:0.85rem;font-weight:700;min-height:1.3em;margin:0;"></p>
+        <div class="menu-option" tabindex="0" onclick="startGame(currentMode)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startGame(currentMode);}">
+            <span>RETRY</span><span class="key-prompt">ENTER</span>
+        </div>
+        <div class="menu-option" tabindex="0" onclick="showMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showMenu();}">
+            <span>MAIN MENU</span><span class="key-prompt">M</span>
+        </div>
+        <a href="index.html" class="home-link">← Back to Arcade Hub</a>
+    </div>
+</div>
+
+<script>
+    // ── Canvas ────────────────────────────────────────────────
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    const stars = Array.from({length: 140}, () => ({
+        x: Math.random() * W, y: Math.random() * H,
+        r: Math.random() * 1.6 + 0.3, sp: Math.random() * 0.35 + 0.15
+    }));
+
+    function drawBG() {
+        const grd = ctx.createLinearGradient(0, 0, 0, H);
+        grd.addColorStop(0, '#0f172a'); grd.addColorStop(1, '#1a0a2e');
+        ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+        stars.forEach(s => {
+            s.x -= s.sp; if (s.x < 0) { s.x = W; s.y = Math.random() * H; }
+            ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.28);
+            ctx.fillStyle = `rgba(255,255,255,${0.25 + s.r * 0.22})`; ctx.fill();
+        });
+    }
+
+    // ── Question Bank ─────────────────────────────────────────
+    const QUESTIONS = {
+        easy: [
+            { s: "The book is ___ the table.",             a: "on",     w: ["in", "at"] },
+            { s: "The cat is hiding ___ the box.",          a: "in",     w: ["on", "under"] },
+            { s: "She lives ___ London.",                   a: "in",     w: ["at", "on"] },
+            { s: "We met ___ the airport.",                 a: "at",     w: ["in", "on"] },
+            { s: "He was born ___ 1990.",                   a: "in",     w: ["on", "at"] },
+            { s: "The match starts ___ 5 PM.",              a: "at",     w: ["in", "on"] },
+            { s: "School is closed ___ Sunday.",            a: "on",     w: ["at", "in"] },
+            { s: "She works ___ a hospital.",               a: "in",     w: ["at", "on"] },
+            { s: "He arrived ___ Monday morning.",          a: "on",     w: ["at", "in"] },
+            { s: "The dog is sleeping ___ the floor.",      a: "on",     w: ["in", "at"] },
+            { s: "They arrived ___ the station.",           a: "at",     w: ["in", "on"] },
+            { s: "We will meet ___ noon.",                  a: "at",     w: ["in", "on"] },
+            { s: "The picture is hanging ___ the wall.",    a: "on",     w: ["in", "at"] },
+            { s: "She sat ___ the front row.",              a: "in",     w: ["at", "on"] },
+            { s: "He is standing ___ the door.",            a: "at",     w: ["in", "on"] },
+        ],
+        medium: [
+            { s: "She walked ___ the bridge.",              a: "across",  w: ["through", "over"] },
+            { s: "The train goes ___ the tunnel.",          a: "through", w: ["across", "over"] },
+            { s: "He jumped ___ the fence.",                a: "over",    w: ["through", "across"] },
+            { s: "She has studied here ___ two years.",     a: "for",     w: ["since", "during"] },
+            { s: "They have been friends ___ childhood.",   a: "since",   w: ["for", "during"] },
+            { s: "He fell asleep ___ the lecture.",         a: "during",  w: ["for", "since"] },
+            { s: "The bird flew ___ the open window.",      a: "through", w: ["across", "into"] },
+            { s: "She drove ___ the countryside.",          a: "through", w: ["across", "around"] },
+            { s: "They sailed ___ the lake.",               a: "across",  w: ["around", "through"] },
+            { s: "He has lived here ___ 2015.",             a: "since",   w: ["for", "during"] },
+            { s: "She has been waiting ___ an hour.",       a: "for",     w: ["since", "during"] },
+            { s: "The soldiers marched ___ the bridge.",    a: "across",  w: ["through", "over"] },
+            { s: "He swam ___ the river to the other side.",a: "across",  w: ["through", "over"] },
+            { s: "She peeked ___ a gap in the curtain.",    a: "through", w: ["into", "across"] },
+            { s: "They didn't speak ___ the movie.",        a: "during",  w: ["for", "since"] },
+        ],
+        hard: [
+            { s: "The painting hangs ___ the fireplace.",   a: "above",   w: ["over", "beside"] },
+            { s: "She sat ___ her two friends.",            a: "between", w: ["among", "beside"] },
+            { s: "The secret was shared ___ all of them.",  a: "among",   w: ["between", "within"] },
+            { s: "He acted ___ thinking twice.",            a: "without", w: ["despite", "against"] },
+            { s: "They won ___ all the odds.",              a: "against", w: ["despite", "without"] },
+            { s: "She succeeded ___ all difficulties.",     a: "despite", w: ["without", "against"] },
+            { s: "He spoke ___ great confidence.",          a: "with",    w: ["in", "by"] },
+            { s: "The results will be known ___ a week.",   a: "within",  w: ["in", "after"] },
+            { s: "They walked ___ the old river road.",     a: "along",   w: ["beside", "through"] },
+            { s: "She is standing just ___ the door.",      a: "behind",  w: ["beside", "near"] },
+            { s: "He completed the task ___ the deadline.", a: "before",  w: ["after", "within"] },
+            { s: "The note was written ___ a blue pen.",    a: "with",    w: ["by", "in"] },
+            { s: "She replied ___ a warm smile.",           a: "with",    w: ["by", "in"] },
+            { s: "He was punished ___ his mistake.",        a: "for",     w: ["because", "due to"] },
+            { s: "They disagreed ___ each other.",          a: "with",    w: ["against", "between"] },
+        ]
+    };
+
+    // ── State ─────────────────────────────────────────────────
+    let gameState = 'MENU', currentMode = 'easy';
+    let score = 0, lives = 3, qIndex = 0;
+    let currentQ = null, opts = [];
+    let timerDuration = 12000, timerStart = 0, timerRAF = 0;
+    let qList = [], answered = false, streak = 0;
+
+    // ── Sound Effects ─────────────────────────────────────────
+    let _ac = null;
+    const getAC = () => { if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)(); return _ac; };
+    function playCorrect() { try { const c=getAC(),t=c.currentTime; [523,659,784].forEach((f,i)=>{ const o=c.createOscillator(),g=c.createGain(); o.connect(g); g.connect(c.destination); o.type='sine'; o.frequency.value=f; const s=t+i*.07; g.gain.setValueAtTime(.22,s); g.gain.exponentialRampToValueAtTime(.001,s+.13); o.start(s); o.stop(s+.13); }); } catch(e){} }
+    function playWrong() { try { const c=getAC(),t=c.currentTime,o=c.createOscillator(),g=c.createGain(); o.connect(g); g.connect(c.destination); o.type='sawtooth'; o.frequency.setValueAtTime(200,t); o.frequency.exponentialRampToValueAtTime(90,t+.28); g.gain.setValueAtTime(.28,t); g.gain.exponentialRampToValueAtTime(.001,t+.3); o.start(t); o.stop(t+.3); } catch(e){} }
+    function playCrash() { try { const c=getAC(),t=c.currentTime,o=c.createOscillator(),g=c.createGain(); o.connect(g); g.connect(c.destination); o.type='triangle'; o.frequency.setValueAtTime(320,t); o.frequency.exponentialRampToValueAtTime(65,t+.6); g.gain.setValueAtTime(.4,t); g.gain.exponentialRampToValueAtTime(.001,t+.65); o.start(t); o.stop(t+.65); } catch(e){} }
+    function playApplause() { try { const c=getAC(),t=c.currentTime,b=c.createBuffer(1,c.sampleRate*1.4,c.sampleRate),d=b.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; const src=c.createBufferSource(); src.buffer=b; const bpf=c.createBiquadFilter(); bpf.type='bandpass'; bpf.frequency.value=1100; bpf.Q.value=.4; const ng=c.createGain(); src.connect(bpf); bpf.connect(ng); ng.connect(c.destination); ng.gain.setValueAtTime(0,t); ng.gain.linearRampToValueAtTime(.3,t+.2); ng.gain.exponentialRampToValueAtTime(.001,t+1.3); src.start(t); src.stop(t+1.4); [523,659,784,1047].forEach((f,i)=>{ const o=c.createOscillator(),g=c.createGain(); o.connect(g); g.connect(c.destination); o.type='triangle'; o.frequency.value=f; const st=t+i*.09; g.gain.setValueAtTime(.18,st); g.gain.exponentialRampToValueAtTime(.001,st+.4); o.start(st); o.stop(st+.4); }); } catch(e){} }
+
+    // ── Helpers ───────────────────────────────────────────────
+    const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
+    const livesHTML = n => '❤️'.repeat(Math.max(0,n)) + '🖤'.repeat(Math.max(0,3-n));
+
+    function flashScreen(color) {
+        const el = document.getElementById('flash');
+        el.style.background = color; el.style.opacity = '0.32';
+        el.style.transition = 'none';
+        requestAnimationFrame(() => { el.style.transition = 'opacity 0.35s'; el.style.opacity = '0'; });
+    }
+
+    function spawnPop(text, color) {
+        const el = document.createElement('div');
+        el.className = 'score-pop';
+        el.style.cssText = `color:${color};left:50%;top:38%;`;
+        el.textContent = text;
+        document.getElementById('game-container').appendChild(el);
+        setTimeout(() => el.remove(), 860);
+    }
+
+    function showFeedback(text, color) {
+        const el = document.getElementById('feedback');
+        el.textContent = text; el.style.cssText = `color:${color};background:rgba(0,0,0,0.55);`;
+        el.classList.remove('hidden');
+        clearTimeout(el._t);
+        el._t = setTimeout(() => el.classList.add('hidden'), 900);
+    }
+
+    // ── Timer ─────────────────────────────────────────────────
+    function startTimer() {
+        timerStart = performance.now();
+        cancelAnimationFrame(timerRAF);
+        function tick() {
+            if (answered || gameState !== 'PLAYING') return;
+            const pct = Math.max(0, 1 - (performance.now() - timerStart) / timerDuration);
+            const bar = document.getElementById('timer-bar');
+            bar.style.width = (pct * 100) + '%';
+            bar.style.background = pct > 0.5 ? '#00f2ff' : pct > 0.25 ? '#ff8800' : '#ff4b4b';
+            if (pct <= 0) { onTimeout(); return; }
+            timerRAF = requestAnimationFrame(tick);
+        }
+        timerRAF = requestAnimationFrame(tick);
+    }
+
+    function onTimeout() {
+        if (answered) return;
+        answered = true; streak = 0;
+        playWrong(); flashScreen('rgba(255,75,75,0.4)');
+        showFeedback('⏰ Time\'s up!  →  ' + currentQ.a, '#ff8800');
+        for (let i = 0; i < 3; i++) {
+            const c = document.getElementById('c' + i);
+            c.classList.add(opts[i] === currentQ.a ? 'reveal' : 'dim');
+            c.style.pointerEvents = 'none';
+        }
+        lives--; document.getElementById('lives-display').innerHTML = livesHTML(lives);
+        if (lives <= 0) setTimeout(() => endGame(false), 1100);
+        else setTimeout(nextQuestion, 1200);
+    }
+
+    // ── Question Loading ──────────────────────────────────────
+    function loadQuestion() {
+        if (qIndex >= qList.length) { endGame(true); return; }
+        currentQ = qList[qIndex]; answered = false;
+        opts = shuffle([currentQ.a, ...currentQ.w]);
+        document.getElementById('sentence-text').innerHTML = currentQ.s.replace('___', '<span class="blank">___</span>');
+        opts.forEach((opt, i) => {
+            const c = document.getElementById('c' + i);
+            c.querySelector('.ct').textContent = opt;
+            c.className = 'choice-card'; c.style.opacity = '1'; c.style.pointerEvents = 'all';
+        });
+        document.getElementById('q-counter').textContent = `Q ${qIndex + 1}/${qList.length}`;
+        timerDuration = Math.max(5000, (currentMode === 'easy' ? 14000 : currentMode === 'medium' ? 11000 : 9000) - qIndex * 150);
+        startTimer();
+    }
+
+    // ── Answer Handling ───────────────────────────────────────
+    function choose(idx) {
+        if (answered || gameState !== 'PLAYING') return;
+        answered = true;
+        cancelAnimationFrame(timerRAF);
+        const chosen = opts[idx];
+        for (let i = 0; i < 3; i++) document.getElementById('c' + i).style.pointerEvents = 'none';
+        const card = document.getElementById('c' + idx);
+        if (chosen === currentQ.a) {
+            card.classList.add('correct');
+            streak++;
+            const pct = Math.max(0, 1 - (performance.now() - timerStart) / timerDuration);
+            const bonus = Math.round(pct * 50) + (streak >= 3 ? 20 : 0);
+            score += 100 + bonus;
+            document.getElementById('score-val').textContent = score;
+            flashScreen('rgba(0,255,136,0.3)');
+            const msg = streak >= 3 ? `🔥 ×${streak} Streak!  +${100+bonus}` : `✓ Correct!  +${100+bonus}`;
+            showFeedback(msg, '#00ff88');
+            spawnPop('+' + (100 + bonus), '#00ff88');
+            playCorrect();
+            document.getElementById('sentence-text').innerHTML = currentQ.s.replace('___', `<span class="filled">${currentQ.a}</span>`);
+            setTimeout(nextQuestion, 750);
+        } else {
+            card.classList.add('wrong');
+            for (let i = 0; i < 3; i++) if (opts[i] === currentQ.a) document.getElementById('c' + i).classList.add('reveal');
+            streak = 0; lives--;
+            document.getElementById('lives-display').innerHTML = livesHTML(lives);
+            flashScreen('rgba(255,75,75,0.4)');
+            showFeedback('✗ Wrong!  Answer: ' + currentQ.a, '#ff6b6b');
+            playWrong();
+            if (lives <= 0) setTimeout(() => endGame(false), 1000);
+            else setTimeout(nextQuestion, 1100);
+        }
+    }
+
+    function nextQuestion() { qIndex++; loadQuestion(); }
+
+    // ── Game Control ──────────────────────────────────────────
+    function startGame(mode) {
+        currentMode = mode; score = 0; lives = 3; qIndex = 0; streak = 0; answered = false;
+        qList = shuffle(QUESTIONS[mode]);
+        document.getElementById('score-val').textContent = '0';
+        document.getElementById('lives-display').innerHTML = livesHTML(3);
+        document.getElementById('main-menu').classList.add('hidden');
+        document.getElementById('game-over').classList.add('hidden');
+        document.getElementById('hud').classList.remove('hidden');
+        document.getElementById('question-zone').classList.remove('hidden');
+        document.getElementById('feedback').classList.add('hidden');
+        gameState = 'PLAYING';
+        loadQuestion();
+    }
+
+    function endGame(won) {
+        cancelAnimationFrame(timerRAF);
+        gameState = 'OVER';
+        document.getElementById('question-zone').classList.add('hidden');
+        document.getElementById('hud').classList.add('hidden');
+        document.getElementById('feedback').classList.add('hidden');
+        const hsKey = 'prepQuestHS_' + currentMode;
+        const hs = parseInt(localStorage.getItem(hsKey) || '0');
+        const newHS = score > hs;
+        if (newHS) localStorage.setItem(hsKey, score);
+        document.getElementById('end-title').textContent = won ? 'COMPLETE! 🎉' : 'GAME OVER';
+        document.getElementById('final-score').textContent = won
+            ? `All ${qList.length} questions done!  Score: ${score}`
+            : `Score: ${score}  (Q ${qIndex}/${qList.length} answered)`;
+        document.getElementById('hs-note').textContent = newHS ? '🏆 NEW HIGH SCORE!' : 'Best: ' + hs;
+        document.getElementById('game-over').classList.remove('hidden');
+        if (won) { setTimeout(playApplause, 300); }
+        else { playCrash(); if (newHS) setTimeout(playApplause, 500); }
+    }
+
+    function showMenu() {
+        cancelAnimationFrame(timerRAF);
+        gameState = 'MENU';
+        document.getElementById('main-menu').classList.remove('hidden');
+        document.getElementById('game-over').classList.add('hidden');
+        document.getElementById('hud').classList.add('hidden');
+        document.getElementById('question-zone').classList.add('hidden');
+        document.getElementById('feedback').classList.add('hidden');
+    }
+
+    // ── Input ─────────────────────────────────────────────────
+    for (let i = 0; i < 3; i++) {
+        const c = document.getElementById('c' + i);
+        c.addEventListener('click', () => choose(i));
+        c.addEventListener('touchstart', (e) => { e.preventDefault(); choose(i); }, { passive: false });
+        c.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(i); } });
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (gameState === 'MENU') {
+            if (e.key === '1') startGame('easy');
+            if (e.key === '2') startGame('medium');
+            if (e.key === '3') startGame('hard');
+        } else if (gameState === 'PLAYING') {
+            if (e.key === '1') choose(0);
+            if (e.key === '2') choose(1);
+            if (e.key === '3') choose(2);
+        } else if (gameState === 'OVER') {
+            if (e.code === 'Enter') startGame(currentMode);
+            if (e.key.toUpperCase() === 'M') showMenu();
+        }
+    });
+
+    // ── Render Loop ───────────────────────────────────────────
+    (function loop() { drawBG(); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>

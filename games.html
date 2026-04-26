@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Stickman Run - Mobile Edition</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏃</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root { --primary: #00f2ff; --secondary: #7000ff; --bg: #0f172a; --glass: rgba(255, 255, 255, 0.1); }
@@ -55,6 +56,11 @@
         .home-link:hover { color: rgba(255,255,255,0.7); }
 
         #mobile-input { position: fixed; left: -9999px; top: 50%; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: none; outline: none; }
+        #onscreen-kb { position: absolute; bottom: 0; left: 0; right: 0; z-index: 20; background: rgba(5,10,25,0.93); padding: 4px 4px 8px; }
+        .kb-row { display: flex; justify-content: center; gap: 3px; margin-bottom: 3px; }
+        .kb-key { flex: 1 1 0; max-width: 38px; padding: 7px 0; background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.22); border-radius: 5px; color: white; font-size: 11px; font-weight: bold; text-align: center; cursor: pointer; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+        .kb-key:active { background: rgba(0,242,255,0.45); border-color: var(--primary); }
+        .kb-del { flex: 1.6 1 0; font-size: 14px; }
 
         @media (max-width: 480px) {
             h1 { font-size: 1.3rem !important; margin-bottom: 0.1rem; }
@@ -95,6 +101,7 @@
     <div id="game-over" class="ui-layer hidden">
         <h1 style="color:#ff4b2b; -webkit-text-fill-color:#ff4b2b">CRASHED</h1>
         <p id="final-score">Final Score: 0</p>
+        <p id="hs-note" style="color:#ffd700;font-size:0.85rem;font-weight:700;min-height:1.3em;margin:0;"></p>
         <div class="menu-option" tabindex="0" onclick="startGame(currentLevel)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startGame(currentLevel);}">
             <span>RETRY</span><span class="key-prompt">ENTER</span>
         </div>
@@ -102,6 +109,11 @@
             <span>MAIN MENU</span><span class="key-prompt">M</span>
         </div>
         <a href="index.html" class="home-link">← Back to Arcade Hub</a>
+    </div>
+    <div id="onscreen-kb" class="hidden">
+        <div class="kb-row"><div class="kb-key" data-key="Q">Q</div><div class="kb-key" data-key="W">W</div><div class="kb-key" data-key="E">E</div><div class="kb-key" data-key="R">R</div><div class="kb-key" data-key="T">T</div><div class="kb-key" data-key="Y">Y</div><div class="kb-key" data-key="U">U</div><div class="kb-key" data-key="I">I</div><div class="kb-key" data-key="O">O</div><div class="kb-key" data-key="P">P</div></div>
+        <div class="kb-row"><div class="kb-key" data-key="A">A</div><div class="kb-key" data-key="S">S</div><div class="kb-key" data-key="D">D</div><div class="kb-key" data-key="F">F</div><div class="kb-key" data-key="G">G</div><div class="kb-key" data-key="H">H</div><div class="kb-key" data-key="J">J</div><div class="kb-key" data-key="K">K</div><div class="kb-key" data-key="L">L</div></div>
+        <div class="kb-row"><div class="kb-key" data-key="Z">Z</div><div class="kb-key" data-key="X">X</div><div class="kb-key" data-key="C">C</div><div class="kb-key" data-key="V">V</div><div class="kb-key" data-key="B">B</div><div class="kb-key" data-key="N">N</div><div class="kb-key" data-key="M">M</div><div class="kb-key kb-del" data-key="DEL">⌫</div></div>
     </div>
 </div>
 <input id="mobile-input" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="characters">
@@ -113,6 +125,14 @@
     const gameOverScreen = document.getElementById('game-over');
     const multiplierBadge = document.getElementById('multiplier-badge');
     const mobileHint = document.getElementById('mobile-hint');
+    const onscreenKb = document.getElementById('onscreen-kb');
+    const isMobile = 'ontouchstart' in window;
+
+    // ── Sound Effects (Web Audio API) ──────────────────────
+    let _ac=null; const getAC=()=>{if(!_ac)_ac=new(window.AudioContext||window.webkitAudioContext)();return _ac;};
+    function playJump(){try{const c=getAC(),t=c.currentTime;[523,659,784].forEach((f,i)=>{const o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.type='sine';o.frequency.value=f;const s=t+i*.07;g.gain.setValueAtTime(.22,s);g.gain.exponentialRampToValueAtTime(.001,s+.13);o.start(s);o.stop(s+.13);});}catch(e){}}
+    function playCrash(){try{const c=getAC(),t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.type='triangle';o.frequency.setValueAtTime(320,t);o.frequency.exponentialRampToValueAtTime(65,t+.6);g.gain.setValueAtTime(.4,t);g.gain.exponentialRampToValueAtTime(.001,t+.65);o.start(t);o.stop(t+.65);}catch(e){}}
+    function playApplause(){try{const c=getAC(),t=c.currentTime,b=c.createBuffer(1,c.sampleRate*1.4,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const src=c.createBufferSource();src.buffer=b;const bpf=c.createBiquadFilter();bpf.type='bandpass';bpf.frequency.value=1100;bpf.Q.value=.4;const ng=c.createGain();src.connect(bpf);bpf.connect(ng);ng.connect(c.destination);ng.gain.setValueAtTime(0,t);ng.gain.linearRampToValueAtTime(.3,t+.2);ng.gain.exponentialRampToValueAtTime(.001,t+1.3);src.start(t);src.stop(t+1.4);[523,659,784,1047].forEach((f,i)=>{const o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.type='triangle';o.frequency.value=f;const st=t+i*.09;g.gain.setValueAtTime(.18,st);g.gain.exponentialRampToValueAtTime(.001,st+.4);o.start(st);o.stop(st+.4);});}catch(e){}}
 
     let uiState = 'MENU';
     let gameActive = false, score = 0, obstaclesPassed = 0, currentLevel = 1;
@@ -172,15 +192,16 @@
 
     function handleWordInput(key) {
         if (uiState !== 'PLAYING') return;
-        if (!/^[A-Z]$/.test(key)) { typedBuffer = ''; return; }
-        const next = obstacles.find(o => o.x > stickman.x - 20);
-        if (!next) return;
-        typedBuffer += key;
-        if (next.word.startsWith(typedBuffer)) {
-            if (typedBuffer === next.word) { stickman.jump(); typedBuffer = ''; }
-        } else {
-            typedBuffer = key;
-            if (!next.word.startsWith(typedBuffer)) typedBuffer = '';
+        if (/^[A-Z]$/.test(key)) {
+            const next = obstacles.find(o => o.x > stickman.x - 20);
+            if (!next) return;
+            typedBuffer += key;
+            if (next.word.startsWith(typedBuffer)) {
+                if (typedBuffer === next.word) { stickman.jump(); typedBuffer = ''; }
+            } else {
+                typedBuffer = key;
+                if (!next.word.startsWith(typedBuffer)) typedBuffer = '';
+            }
         }
     }
 
@@ -204,6 +225,15 @@
             else handleJumpInput(key);
         }
     });
+
+    onscreenKb.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const key = e.target.closest('[data-key]')?.dataset.key;
+        if (!key || uiState !== 'PLAYING') return;
+        if (key === 'DEL') { typedBuffer = typedBuffer.slice(0, -1); return; }
+        if (currentLevel === 3) handleWordInput(key);
+        else if (currentLevel === 2) handleJumpInput(key);
+    }, { passive: false });
 
     window.addEventListener('keydown', (e) => {
         const key = e.key.toUpperCase();
@@ -235,10 +265,11 @@
         currentLevel = level; score = 0; obstaclesPassed = 0; obstacles = []; bonusTexts = []; gameActive = true; uiState = 'PLAYING'; typedBuffer = '';
         mainMenu.classList.add('hidden'); gameOverScreen.classList.add('hidden'); hud.classList.remove('hidden'); mobileHint.classList.remove('hidden');
         mobileHint.innerText = currentLevel === 1 ? 'TAP TO JUMP' : currentLevel === 3 ? 'TAP SCREEN → TYPE WORD' : 'TAP SCREEN → TYPE LETTER';
+        if (isMobile && currentLevel >= 2) onscreenKb.classList.remove('hidden'); else onscreenKb.classList.add('hidden');
         updateHUD(); requestAnimationFrame(gameLoop);
     }
 
-    function showMenu() { uiState = 'MENU'; gameActive = false; mainMenu.classList.remove('hidden'); gameOverScreen.classList.add('hidden'); hud.classList.add('hidden'); mobileHint.classList.add('hidden'); }
+    function showMenu() { uiState = 'MENU'; gameActive = false; mainMenu.classList.remove('hidden'); gameOverScreen.classList.add('hidden'); hud.classList.add('hidden'); mobileHint.classList.add('hidden'); onscreenKb.classList.add('hidden'); }
 
     function updateHUD() {
         document.getElementById('score-val').innerText = score;
@@ -276,13 +307,20 @@
                 if (typedBuffer) { ctx.fillStyle = '#00ff88'; ctx.font = 'bold 15px Arial'; ctx.fillText(typedBuffer, midX, o.y - 10); }
             }
             if (stickman.x + 10 > o.x && stickman.x - 10 < o.x + o.w && stickman.y > o.y) {
-                gameActive = false; uiState = 'GAMEOVER'; gameOverScreen.classList.remove('hidden'); mobileHint.classList.add('hidden');
+                const _hsKey = 'stickmanHS_' + currentLevel;
+                const _hs = parseInt(localStorage.getItem(_hsKey) || '0');
+                const _newHS = score > _hs;
+                if (_newHS) localStorage.setItem(_hsKey, score);
+                gameActive = false; uiState = 'GAMEOVER'; gameOverScreen.classList.remove('hidden'); mobileHint.classList.add('hidden'); onscreenKb.classList.add('hidden');
                 document.getElementById('final-score').innerText = `Final Score: ${score}`;
+                document.getElementById('hs-note').innerText = _newHS ? '🏆 NEW HIGH SCORE!' : 'Best: ' + _hs;
+                playCrash();
+                if (_newHS) setTimeout(playApplause, 500);
             }
             if (!o.passed && o.x < stickman.x) {
                 o.passed = true; if (currentLevel === 3) typedBuffer = '';
                 const pointsGained = getMultiplier(); score += pointsGained; obstaclesPassed++;
-                bonusTexts.push(new FloatingText(stickman.x, stickman.y - 70, `+${pointsGained}`, '#fff')); updateHUD();
+                bonusTexts.push(new FloatingText(stickman.x, stickman.y - 70, `+${pointsGained}`, '#fff')); updateHUD(); playJump();
             }
             if (o.x + o.w < 0) obstacles.splice(i, 1);
         }
