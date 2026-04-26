@@ -57,7 +57,7 @@
         .home-link { display: inline-block; margin-top: 16px; font-size: 0.65rem; font-weight: 700; letter-spacing: 1px; color: rgba(255,255,255,0.3); text-decoration: none; text-transform: uppercase; transition: color 0.2s; }
         .home-link:hover { color: rgba(255,255,255,0.7); }
 
-        #mobile-input { position: fixed; left: -9999px; top: 50%; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: none; outline: none; }
+        #mobile-input { position: fixed; bottom: 1px; left: 50%; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: none; outline: none; pointer-events: none; }
         #kb-strip { position: fixed; left: 0; right: 0; bottom: 0; height: 52px; background: rgba(0,0,0,0.97); border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; z-index: 100; padding: 0 10px; gap: 8px; font-family: 'Roboto Mono', monospace; }
         #kb-strip .kb-lane-btn { background: rgba(255,0,123,0.18); border: 1px solid rgba(255,0,123,0.4); color: white; padding: 9px 14px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer; touch-action: manipulation; font-family: 'Roboto Mono', monospace; min-width: 80px; }
         #kb-strip .kb-type-btn { flex: 1; background: rgba(0,242,255,0.1); border: 1px solid rgba(0,242,255,0.3); color: var(--neon-blue); padding: 9px 10px; border-radius: 8px; font-size: 0.73rem; font-weight: 700; cursor: pointer; text-align: center; touch-action: manipulation; }
@@ -204,7 +204,7 @@
         else if (touchX > canvas.width * 0.7) moveRight();
         else if (gameMode === 'TRAINING') attemptJump();
         else if (gameState === 'PLAYING') mobileInput.focus();
-    });
+    }, { passive: false });
 
     window.addEventListener('keydown', (e) => {
         if (gameState === 'START') {

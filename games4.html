@@ -43,6 +43,8 @@
         .ep-tag.wrong   { color: rgba(255,255,255,0.4); }
         .ep-why { color: rgba(255,255,255,0.55); }
         .ep-why.correct { color: #a3f0c6; }
+        #next-btn { margin-top: 8px; float: right; background: linear-gradient(to right,var(--primary),var(--secondary)); color: #0f172a; border: none; border-radius: 20px; padding: 5px 16px; font-size: 0.72rem; font-weight: 800; cursor: pointer; pointer-events: all; font-family: 'Poppins', sans-serif; letter-spacing: 0.5px; }
+        #next-btn:hover { filter: brightness(1.12); }
         @keyframes pop   { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.1); } }
         @keyframes shake { 0%,100%{ transform:translateX(0); } 25%{ transform:translateX(-7px); } 75%{ transform:translateX(7px); } }
         #feedback { position: absolute; top: 58%; left: 50%; transform: translateX(-50%); font-size: clamp(0.8rem,2.5vw,1rem); font-weight: 700; padding: 6px 18px; border-radius: 20px; z-index: 6; pointer-events: none; white-space: nowrap; }
@@ -87,6 +89,7 @@
     <div id="explain-panel" class="hidden">
         <div class="ep-title">📚 Why?</div>
         <div id="explain-content"></div>
+        <div style="text-align:right;margin-top:7px;"><button id="next-btn" onclick="dismissExplanation()">Got it — Next →</button></div>
     </div>
     <div id="feedback" class="hidden"></div>
     <div id="main-menu" class="ui-layer">
@@ -248,7 +251,7 @@
     let score = 0, lives = 3, qIndex = 0;
     let currentQ = null, opts = [];
     let timerDuration = 12000, timerStart = 0, timerRAF = 0;
-    let qList = [], answered = false, streak = 0;
+    let qList = [], answered = false, streak = 0, pendingNext = null;
 
     // ── Sound Effects ─────────────────────────────────────────
     let _ac = null;
@@ -289,6 +292,11 @@
         }).join('');
         document.getElementById('explain-panel').classList.remove('hidden');
     }
+    function dismissExplanation() {
+        if (!pendingNext) return;
+        document.getElementById('explain-panel').classList.add('hidden');
+        const fn = pendingNext; pendingNext = null; fn();
+    }
 
     // ── Timer ─────────────────────────────────────────────────
     function startTimer() {
@@ -311,7 +319,7 @@
         for (let i=0;i<3;i++) { const c=document.getElementById('c'+i); c.classList.add(opts[i]===currentQ.a?'reveal':'dim'); c.style.pointerEvents='none'; }
         showExplanation();
         lives--; document.getElementById('lives-display').innerHTML = livesHTML(lives);
-        if (lives<=0) setTimeout(()=>endGame(false),1700); else setTimeout(nextQuestion,1800);
+        pendingNext = lives <= 0 ? () => endGame(false) : nextQuestion;
     }
 
     // ── Question Loading ──────────────────────────────────────
@@ -327,6 +335,7 @@
         });
         document.getElementById('q-counter').textContent = `Q ${qIndex+1}/${qList.length}`;
         document.getElementById('explain-panel').classList.add('hidden');
+        pendingNext = null;
         timerDuration = Math.max(5000, (currentMode==='easy'?14000:currentMode==='medium'?12000:10000) - qIndex*150);
         startTimer();
     }
@@ -357,7 +366,7 @@
             flashScreen('rgba(255,75,75,0.4)');
             showFeedback('✗ Wrong!  Answer: '+currentQ.a,'#ff6b6b');
             playWrong(); showExplanation();
-            if (lives<=0) setTimeout(()=>endGame(false),1700); else setTimeout(nextQuestion,1800);
+            pendingNext = lives <= 0 ? () => endGame(false) : nextQuestion;
         }
     }
     function nextQuestion() { qIndex++; loadQuestion(); }
@@ -409,7 +418,9 @@
     }
     window.addEventListener('keydown',(e)=>{
         if(gameState==='MENU'){if(e.key==='1')startGame('easy');if(e.key==='2')startGame('medium');if(e.key==='3')startGame('hard');}
-        else if(gameState==='PLAYING'){if(e.key==='1')choose(0);if(e.key==='2')choose(1);if(e.key==='3')choose(2);}
+        else if(gameState==='PLAYING'){
+            if(answered&&pendingNext&&(e.key===' '||e.key==='Enter')){e.preventDefault();dismissExplanation();return;}
+            if(e.key==='1')choose(0);if(e.key==='2')choose(1);if(e.key==='3')choose(2);}
         else if(gameState==='OVER'){if(e.code==='Enter')startGame(currentMode);if(e.key.toUpperCase()==='M')showMenu();}
     });
 

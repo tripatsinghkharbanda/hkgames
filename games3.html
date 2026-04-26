@@ -63,6 +63,8 @@
         .ep-tag.wrong   { color: rgba(255,255,255,0.4); }
         .ep-why { color: rgba(255,255,255,0.55); }
         .ep-why.correct { color: #a3f0c6; }
+        #next-btn { margin-top: 8px; float: right; background: linear-gradient(to right,#f97316,#facc15); color: #0f172a; border: none; border-radius: 20px; padding: 5px 16px; font-size: 0.72rem; font-weight: 800; cursor: pointer; pointer-events: all; font-family: 'Poppins', sans-serif; letter-spacing: 0.5px; }
+        #next-btn:hover { filter: brightness(1.12); }
 
         @keyframes pop   { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.1); } }
         @keyframes shake { 0%,100%{ transform:translateX(0); } 25%{ transform:translateX(-7px); } 75%{ transform:translateX(7px); } }
@@ -129,6 +131,7 @@
     <div id="explain-panel" class="hidden">
         <div class="ep-title">📚 Why?</div>
         <div id="explain-content"></div>
+        <div style="text-align:right;margin-top:7px;"><button id="next-btn" onclick="dismissExplanation()">Got it — Next →</button></div>
     </div>
 
     <div id="feedback" class="hidden"></div>
@@ -397,7 +400,7 @@
     let score = 0, lives = 3, qIndex = 0;
     let currentQ = null, opts = [];
     let timerDuration = 12000, timerStart = 0, timerRAF = 0;
-    let qList = [], answered = false, streak = 0;
+    let qList = [], answered = false, streak = 0, pendingNext = null;
 
     // ── Sound Effects ─────────────────────────────────────────
     let _ac = null;
@@ -449,6 +452,11 @@
         }).join('');
         document.getElementById('explain-panel').classList.remove('hidden');
     }
+    function dismissExplanation() {
+        if (!pendingNext) return;
+        document.getElementById('explain-panel').classList.add('hidden');
+        const fn = pendingNext; pendingNext = null; fn();
+    }
 
     // ── Timer ─────────────────────────────────────────────────
     function startTimer() {
@@ -478,8 +486,7 @@
         }
         showExplanation();
         lives--; document.getElementById('lives-display').innerHTML = livesHTML(lives);
-        if (lives <= 0) setTimeout(() => endGame(false), 1700);
-        else setTimeout(nextQuestion, 1800);
+        pendingNext = lives <= 0 ? () => endGame(false) : nextQuestion;
     }
 
     // ── Question Loading ──────────────────────────────────────
@@ -495,6 +502,7 @@
         });
         document.getElementById('q-counter').textContent = `Q ${qIndex + 1}/${qList.length}`;
         document.getElementById('explain-panel').classList.add('hidden');
+        pendingNext = null;
         timerDuration = Math.max(5000, (currentMode === 'easy' ? 14000 : currentMode === 'medium' ? 11000 : 9000) - qIndex * 150);
         startTimer();
     }
@@ -530,8 +538,7 @@
             showFeedback('✗ Wrong!  Answer: ' + currentQ.a, '#ff6b6b');
             playWrong();
             showExplanation();
-            if (lives <= 0) setTimeout(() => endGame(false), 1700);
-            else setTimeout(nextQuestion, 1800);
+            pendingNext = lives <= 0 ? () => endGame(false) : nextQuestion;
         }
     }
 
@@ -596,6 +603,7 @@
             if (e.key === '2') startGame('medium');
             if (e.key === '3') startGame('hard');
         } else if (gameState === 'PLAYING') {
+            if (answered && pendingNext && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); dismissExplanation(); return; }
             if (e.key === '1') choose(0);
             if (e.key === '2') choose(1);
             if (e.key === '3') choose(2);
