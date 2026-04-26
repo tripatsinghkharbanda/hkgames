@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Stickman Run - Mobile Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #00f2ff; --secondary: #7000ff; --bg: #0f172a; --glass: rgba(255, 255, 255, 0.1); }
+        * { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: var(--bg); font-family: 'Poppins', sans-serif; color: white; overflow: hidden; }
+
+        #game-container {
+            position: relative;
+            width: 100%; max-width: 900px;
+            aspect-ratio: 9/5;
+            background: #1e293b;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        canvas { width: 100%; height: 100%; display: block; }
+
+        .ui-layer { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 20px; }
+        .hidden { display: none !important; }
+
+        h1 { font-size: clamp(1.5rem, 8vw, 3rem); margin-bottom: 0.5rem; background: linear-gradient(to right, var(--primary), var(--secondary)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; text-transform: uppercase; text-align: center; }
+        p { color: #94a3b8; text-align: center; margin-bottom: 1rem; font-size: 0.9rem; }
+
+        .menu-option {
+            padding: 12px 24px; margin: 8px; font-size: 16px; font-weight: 700;
+            background: var(--glass); color: white; border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 12px; width: 90%; max-width: 320px; cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        .key-prompt { background: white; color: black; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-right: 10px; }
+
+        #hud {
+            position: absolute; top: 10px; left: 10px; right: 10px;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 15px; background: var(--glass); border-radius: 12px;
+            font-size: 0.8rem; font-weight: 700; z-index: 5; pointer-events: none;
+        }
+
+        #multiplier-badge { background: linear-gradient(45deg, #ff0066, #ff8800); padding: 2px 10px; border-radius: 20px; font-size: 11px; }
+        .stat span { color: var(--primary); }
+        
+        /* Mobile "Jump" hint */
+        #mobile-hint { position: absolute; bottom: 10px; width: 100%; text-align: center; font-size: 0.7rem; color: rgba(255,255,255,0.3); pointer-events: none; }
+
+        .home-link { display: inline-block; margin-top: 18px; font-size: 0.72rem; font-weight: 600; letter-spacing: 1px; color: rgba(255,255,255,0.3); text-decoration: none; text-transform: uppercase; transition: color 0.2s; }
+        .home-link:hover { color: rgba(255,255,255,0.7); }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="hud" class="hidden">
+        <div class="stat">SCORE: <span id="score-val">0</span></div>
+        <div id="multiplier-badge">2X MULTIPLIER</div>
+        <div class="stat">SPEED: <span id="speed-val">6</span></div>
+    </div>
+
+    <canvas id="gameCanvas" width="900" height="500"></canvas>
+    <div id="mobile-hint" class="hidden">TAP ANYWHERE TO JUMP</div>
+    
+    <div id="main-menu" class="ui-layer">
+        <h1>STICKMAN RUN</h1>
+        <p>Select Level to Start:</p>
+        <div class="menu-option" onclick="startGame(1)">
+            <span>LEVEL 1 (Space Jump)</span><span class="key-prompt">1</span>
+        </div>
+        <div class="menu-option" onclick="startGame(2)">
+            <span>LEVEL 2 (Key Match)</span><span class="key-prompt">2</span>
+        </div>
+        <a href="index.html" class="home-link">← Back to Arcade Hub</a>
+    </div>
+
+    <div id="game-over" class="ui-layer hidden">
+        <h1 style="color:#ff4b2b; -webkit-text-fill-color:#ff4b2b">CRASHED</h1>
+        <p id="final-score">Final Score: 0</p>
+        <div class="menu-option" onclick="startGame(currentLevel)">
+            <span>RETRY</span><span class="key-prompt">ENTER</span>
+        </div>
+        <div class="menu-option" onclick="showMenu()">
+            <span>MAIN MENU</span><span class="key-prompt">M</span>
+        </div>
+        <a href="index.html" class="home-link">← Back to Arcade Hub</a>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const hud = document.getElementById('hud');
+    const mainMenu = document.getElementById('main-menu');
+    const gameOverScreen = document.getElementById('game-over');
+    const multiplierBadge = document.getElementById('multiplier-badge');
+    const mobileHint = document.getElementById('mobile-hint');
+
+    let uiState = 'MENU';
+    let gameActive = false, score = 0, obstaclesPassed = 0, currentLevel = 1;
+    let particles = [], bonusTexts = [], obstacles = [], obstacleTimer = 0;
+    const groundY = 400, gravity = 0.5, jumpForce = -13;
+
+    const getMultiplier = () => (Math.floor(obstaclesPassed / 10) + 1) * 2;
+    const getSpeed = () => 6 + (Math.floor(obstaclesPassed / 10));
+
+    class FloatingText {
+        constructor(x, y, text, color) { this.x = x; this.y = y; this.text = text; this.color = color; this.life = 1.0; }
+        update() { this.y -= 1.5; this.life -= 0.02; }
+        draw() { ctx.globalAlpha = this.life; ctx.fillStyle = this.color; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center'; ctx.fillText(this.text, this.x, this.y); ctx.globalAlpha = 1; }
+    }
+
+    const stickman = {
+        x: 150, y: groundY, dy: 0, isJumping: false,
+        draw() {
+            ctx.save(); ctx.translate(this.x, this.y);
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(0, -55, 10, 0, 6.28); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, -45); ctx.lineTo(0, -15); ctx.moveTo(-15, -35); ctx.lineTo(15, -35);
+            const leg = this.isJumping ? 8 : 0;
+            ctx.moveTo(0, -15); ctx.lineTo(-12, -leg); ctx.moveTo(0, -15); ctx.lineTo(12, -leg);
+            ctx.stroke(); ctx.restore();
+        },
+        update() {
+            this.y += this.dy;
+            if (this.y < groundY) this.dy += gravity;
+            else { this.y = groundY; this.dy = 0; this.isJumping = false; }
+        },
+        jump() { if (!this.isJumping) { this.dy = jumpForce; this.isJumping = true; } }
+    };
+
+    function handleJumpInput(key = null) {
+        if (uiState !== 'PLAYING') return;
+        if (currentLevel === 1) {
+            stickman.jump();
+        } else if (currentLevel === 2) {
+            const next = obstacles.find(o => o.x > stickman.x - 20);
+            if (next && (key === next.char || key === null)) stickman.jump(); 
+        }
+    }
+
+    // Touch Event
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        handleJumpInput(); 
+    });
+
+    window.addEventListener('keydown', (e) => {
+        const key = e.key.toUpperCase();
+        if (uiState === 'MENU') {
+            if (key === '1') startGame(1);
+            if (key === '2') startGame(2);
+        } else if (uiState === 'PLAYING') {
+            if (e.code === 'Space') handleJumpInput();
+            else handleJumpInput(key);
+        } else if (uiState === 'GAMEOVER') {
+            if (e.code === 'Enter') startGame(currentLevel);
+            if (key === 'M') showMenu();
+        }
+    });
+
+    function spawnObstacle() {
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        obstacles.push({ x: canvas.width + 50, y: groundY - 35, w: 35, h: 35, speed: getSpeed(), char: chars[Math.floor(Math.random() * chars.length)], passed: false });
+    }
+
+    function startGame(level) {
+        currentLevel = level; score = 0; obstaclesPassed = 0; obstacles = []; bonusTexts = []; gameActive = true; uiState = 'PLAYING';
+        mainMenu.classList.add('hidden'); gameOverScreen.classList.add('hidden'); hud.classList.remove('hidden'); mobileHint.classList.remove('hidden');
+        updateHUD(); requestAnimationFrame(gameLoop);
+    }
+
+    function showMenu() { uiState = 'MENU'; gameActive = false; mainMenu.classList.remove('hidden'); gameOverScreen.classList.add('hidden'); hud.classList.add('hidden'); mobileHint.classList.add('hidden'); }
+
+    function updateHUD() {
+        document.getElementById('score-val').innerText = score;
+        document.getElementById('speed-val').innerText = getSpeed();
+        multiplierBadge.innerText = `${getMultiplier()}X MULTIPLIER`;
+    }
+
+    function gameLoop() {
+        if (!gameActive) return;
+        ctx.fillStyle = '#1e293b'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(canvas.width, groundY); ctx.stroke();
+
+        stickman.update(); stickman.draw();
+        bonusTexts.forEach((t, i) => { t.update(); t.draw(); if (t.life <= 0) bonusTexts.splice(i, 1); });
+
+        if (++obstacleTimer > Math.max(45, 95 - (Math.floor(obstaclesPassed/10) * 4))) { spawnObstacle(); obstacleTimer = 0; }
+
+        const color = currentLevel === 1 ? '#00f2ff' : '#7000ff';
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            const o = obstacles[i]; o.x -= o.speed;
+            ctx.fillStyle = color; ctx.fillRect(o.x, o.y, o.w, o.h);
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(o.x, o.y, o.w, o.h);
+            if (currentLevel === 2) { ctx.fillStyle = 'white'; ctx.font = 'bold 20px Arial'; ctx.textAlign = 'center'; ctx.fillText(o.char, o.x + o.w/2, o.y - 12); }
+            if (stickman.x + 10 > o.x && stickman.x - 10 < o.x + o.w && stickman.y > o.y) {
+                gameActive = false; uiState = 'GAMEOVER'; gameOverScreen.classList.remove('hidden'); mobileHint.classList.add('hidden');
+                document.getElementById('final-score').innerText = `Final Score: ${score}`;
+            }
+            if (!o.passed && o.x < stickman.x) {
+                o.passed = true; const pointsGained = getMultiplier(); score += pointsGained; obstaclesPassed++;
+                bonusTexts.push(new FloatingText(stickman.x, stickman.y - 70, `+${pointsGained}`, '#fff')); updateHUD();
+            }
+            if (o.x + o.w < 0) obstacles.splice(i, 1);
+        }
+        requestAnimationFrame(gameLoop);
+    }
+</script>
+</body>
+</html>

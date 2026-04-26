@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Type-Jump: Pro Performance Mobile</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+
+    <style>
+        :root { --neon-blue: #00f2ff; --neon-pink: #ff007b; --bg: #0d0d0f; }
+        *, *::before, *::after { box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Roboto Mono', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+
+        #game-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+
+        #canvas-wrapper {
+            position: relative;
+            width: min(95vw, calc(80vh * (2 / 3)));
+            aspect-ratio: 2 / 3;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: #111;
+            border: 3px solid #333;
+            border-radius: 12px;
+        }
+
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.92);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(8px);
+            z-index: 10;
+            padding: 20px;
+            text-align: center;
+            border-radius: 12px;
+        }
+        .hidden { display: none !important; }
+
+        h1 { font-size: clamp(1.2rem, 6vw, 2rem); margin: 0; background: linear-gradient(to right, var(--neon-blue), var(--neon-pink)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+        button { width: 280px; max-width: 80%; padding: 15px; margin: 10px 0; font-family: 'Roboto Mono'; cursor: pointer; background: none; color: white; border: 2px solid var(--neon-blue); border-radius: 8px; transition: background 0.2s; display: flex; justify-content: space-between; align-items: center; }
+        button:hover { background: rgba(0, 242, 255, 0.08); }
+
+        .hud { position: absolute; top: 12px; left: 0; width: 100%; display: flex; justify-content: space-around; font-weight: bold; color: var(--neon-blue); z-index: 5; pointer-events: none; font-size: 0.75rem; }
+
+        .home-link { display: inline-block; margin-top: 16px; font-size: 0.65rem; font-weight: 700; letter-spacing: 1px; color: rgba(255,255,255,0.3); text-decoration: none; text-transform: uppercase; transition: color 0.2s; }
+        .home-link:hover { color: rgba(255,255,255,0.7); }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="canvas-wrapper">
+        <div class="hud">
+            <div>SCORE: <span id="hud-score">0</span></div>
+            <div style="color:var(--neon-pink)"><span id="hud-speed">40</span> KM/H</div>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="menu-start" class="overlay">
+            <h1>TYPING ACADEMY</h1>
+            <p style="color: #888; font-size: 0.7rem;">MOBILE RESPONSIVE MODE</p>
+            <button onclick="startGame('TRAINING')">1. TRAINING <span>[1]</span></button>
+            <button onclick="startGame('REAL')">2. REAL PLAY <span>[2]</span></button>
+            <a href="index.html" class="home-link">← Back to Arcade Hub</a>
+        </div>
+
+        <div id="menu-over" class="overlay hidden">
+            <h1 style="color: var(--neon-pink); -webkit-text-fill-color: var(--neon-pink);">CRASHED</h1>
+            <p>FINAL SCORE: <span id="final-score">0</span></p>
+            <button onclick="retryGame()">TRY AGAIN <span>[RETRY]</span></button>
+            <a href="index.html" class="home-link">← Back to Arcade Hub</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    
+    canvas.width = 400;
+    canvas.height = 600;
+
+    const NEON_BLUE = "#00f2ff";
+    const NEON_PINK = "#ff007b";
+    const TYPING_TIERS = ["FJ", "FJDK", "ASDFJKL;", "ASDFJKL;EI", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+
+    let gameState = 'START';
+    let gameMode = 'REAL';
+    let score = 0, jumpSuccessCount = 0, baseSpeed = 4.5, speedKmh = 40;
+    let obstacles = [], bonuses = [], spawnTimer = 0, lastTime = performance.now();
+
+    const player = { lane: 1, x: 200, y: 500, w: 36, h: 60, isJumping: false, jumpH: 0, jumpV: 0, gravity: 0.8, jumpPower: 17 };
+
+    // --- Input Logic ---
+    function moveLeft() { if(player.lane > 0) player.lane--; }
+    function moveRight() { if(player.lane < 2) player.lane++; }
+    function attemptJump(key = null) {
+        if (!player.isJumping) {
+            const target = obstacles.find(o => o.lane === player.lane && o.y < player.y && o.y > player.y - 300);
+            const k = key ? key.toUpperCase() : null;
+            if ((gameMode === 'TRAINING') || (gameMode === 'REAL' && target && (k === target.char || k === null))) {
+                player.isJumping = true;
+                player.jumpV = player.jumpPower;
+                if(target) target.jumped = true;
+            }
+        }
+    }
+
+    // Touch Handling (Tap left side, right side, or center)
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const touchX = (e.touches[0].clientX - rect.left) / rect.width * canvas.width;
+        
+        if (touchX < canvas.width * 0.3) moveLeft();
+        else if (touchX > canvas.width * 0.7) moveRight();
+        else attemptJump();
+    });
+
+    window.addEventListener('keydown', (e) => {
+        if (gameState === 'START') {
+            if (e.key === "1") startGame('TRAINING');
+            if (e.key === "2") startGame('REAL');
+        } else if (gameState === 'PLAYING') {
+            if (e.key === "ArrowLeft") moveLeft();
+            if (e.key === "ArrowRight") moveRight();
+            if (e.key === " " || e.key.length === 1) attemptJump(e.key);
+        } else if (gameState === 'OVER' && e.key === "Enter") {
+            retryGame();
+        }
+    });
+
+    function startGame(mode) {
+        gameMode = mode; score = 0; jumpSuccessCount = 0; baseSpeed = 4.5; speedKmh = 40;
+        obstacles = []; bonuses = []; player.lane = 1; gameState = 'PLAYING';
+        document.querySelectorAll('.overlay').forEach(m => m.classList.add('hidden'));
+        lastTime = performance.now();
+    }
+
+    function retryGame() { startGame(gameMode); }
+    function stopGame() { gameState = 'START'; document.getElementById('menu-over').classList.add('hidden'); document.getElementById('menu-start').classList.remove('hidden'); }
+
+    function update(dt) {
+        if(gameState !== 'PLAYING') return;
+        const LANE_X = [66, 200, 333];
+        const targetX = LANE_X[player.lane] - player.w/2;
+        player.x += (targetX - player.x) * (0.2 * dt);
+
+        if(player.isJumping) {
+            player.jumpH += player.jumpV * dt;
+            player.jumpV -= player.gravity * dt;
+            if(player.jumpH <= 0) { player.jumpH = 0; player.isJumping = false; }
+        }
+
+        spawnTimer += dt;
+        if(spawnTimer > Math.max(25, 70 - (speedKmh/6))) {
+            const lane = Math.floor(Math.random() * 3);
+            const tier = TYPING_TIERS[Math.min(Math.floor(jumpSuccessCount / 10), TYPING_TIERS.length - 1)];
+            obstacles.push({ lane, x: LANE_X[lane], y: -100, char: tier[Math.floor(Math.random() * tier.length)], jumped: false });
+            spawnTimer = 0;
+        }
+
+        for(let i = obstacles.length - 1; i >= 0; i--) {
+            let o = obstacles[i]; o.y += baseSpeed * dt;
+            if(Math.abs((player.x + player.w/2) - o.x) < 25 && Math.abs((player.y + 20) - (o.y + 30)) < 40) {
+                if(player.jumpH < 35) {
+                    gameState = 'OVER'; document.getElementById('final-score').innerText = score; document.getElementById('menu-over').classList.remove('hidden');
+                }
+            }
+            if(o.y > canvas.height) {
+                if(o.jumped) {
+                    score += 50; jumpSuccessCount++; if(jumpSuccessCount % 5 === 0) { baseSpeed += 0.2; speedKmh += 1; }
+                    bonuses.push({x: player.x+20, y: player.y, t: "+50", c: NEON_BLUE, l: 1});
+                } else { score += 10; }
+                obstacles.splice(i, 1);
+            }
+        }
+        for(let i = bonuses.length-1; i>=0; i--) { bonuses[i].y -= 2 * dt; bonuses[i].l -= 0.03 * dt; if(bonuses[i].l <= 0) bonuses.splice(i, 1); }
+        document.getElementById('hud-score').innerText = score; document.getElementById('hud-speed').innerText = speedKmh;
+    }
+
+    function draw() {
+        ctx.fillStyle = "#111"; ctx.fillRect(0,0, canvas.width, canvas.height);
+        ctx.fillStyle = "#18181c"; ctx.fillRect(20, 0, canvas.width-40, canvas.height);
+        ctx.strokeStyle = "#252528"; ctx.setLineDash([20, 30]);
+        for(let i=1; i<3; i++) { ctx.beginPath(); ctx.moveTo(i * (canvas.width/3), 0); ctx.lineTo(i * (canvas.width/3), canvas.height); ctx.stroke(); }
+        obstacles.forEach(o => { ctx.fillStyle = "#b33939"; ctx.beginPath(); ctx.roundRect(o.x-18, o.y, 36, 58, 5); ctx.fill(); ctx.fillStyle = "white"; ctx.font = "bold 20px Roboto Mono"; ctx.textAlign = "center"; ctx.fillText(o.char, o.x, o.y + 38); });
+        if(player.isJumping) { ctx.shadowBlur = 15; ctx.shadowColor = NEON_BLUE; }
+        ctx.fillStyle = NEON_BLUE; ctx.beginPath(); ctx.roundRect(player.x, player.y - player.jumpH, player.w, player.h, 6); ctx.fill(); ctx.shadowBlur = 0;
+        bonuses.forEach(b => { ctx.globalAlpha = b.l; ctx.fillStyle = b.c; ctx.fillText(b.t, b.x, b.y); });
+        ctx.globalAlpha = 1;
+    }
+
+    function loop(currentTime) {
+        const dt = Math.min((currentTime - lastTime) / (1000 / 60), 2.0);
+        lastTime = currentTime; update(dt); draw(); requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HK Games — Arcade Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --primary: #00f2ff;
+            --secondary: #7000ff;
+            --accent: #ff007b;
+            --bg: #0a0f1e;
+            --card-bg: rgba(255, 255, 255, 0.04);
+            --border: rgba(255, 255, 255, 0.08);
+        }
+
+        body {
+            min-height: 100vh;
+            background: var(--bg);
+            background-image:
+                radial-gradient(ellipse at 15% 55%, rgba(112, 0, 255, 0.18) 0%, transparent 55%),
+                radial-gradient(ellipse at 85% 20%, rgba(0, 242, 255, 0.12) 0%, transparent 55%);
+            font-family: 'Poppins', sans-serif;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem 4rem;
+        }
+
+        /* ── Header ── */
+        header {
+            text-align: center;
+            margin-bottom: 3.5rem;
+            padding-top: 2.5rem;
+        }
+
+        .logo {
+            font-size: clamp(2.8rem, 10vw, 5.5rem);
+            font-weight: 900;
+            letter-spacing: -3px;
+            line-height: 1;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .tagline {
+            display: inline-block;
+            margin-top: 0.6rem;
+            color: rgba(255, 255, 255, 0.35);
+            font-size: clamp(0.65rem, 2vw, 0.85rem);
+            letter-spacing: 5px;
+            text-transform: uppercase;
+        }
+
+        /* ── Grid ── */
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 760px;
+        }
+
+        /* ── Card ── */
+        .game-card {
+            position: relative;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 2rem 1.75rem 1.75rem;
+            text-decoration: none;
+            color: white;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+            cursor: pointer;
+        }
+
+        .game-card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity 0.35s ease;
+            border-radius: 24px;
+        }
+
+        .card-1::after { background: radial-gradient(ellipse at top left, rgba(0,242,255,0.08), transparent 70%); }
+        .card-2::after { background: radial-gradient(ellipse at top left, rgba(255,0,123,0.08), transparent 70%); }
+
+        .game-card:hover {
+            transform: translateY(-7px);
+            border-color: rgba(255, 255, 255, 0.16);
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+        }
+        .game-card:hover::after { opacity: 1; }
+        .game-card:active { transform: translateY(-2px); }
+
+        /* Card accent line */
+        .game-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 2rem; right: 2rem;
+            height: 2px;
+            border-radius: 0 0 4px 4px;
+        }
+        .card-1::before { background: linear-gradient(to right, var(--primary), var(--secondary)); }
+        .card-2::before { background: linear-gradient(to right, var(--accent), var(--primary)); }
+
+        .card-icon {
+            font-size: 2.6rem;
+            line-height: 1;
+            margin-bottom: 0.25rem;
+        }
+
+        .card-badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            padding: 3px 10px;
+            border-radius: 20px;
+            width: fit-content;
+        }
+
+        .badge-1 {
+            background: rgba(0, 242, 255, 0.12);
+            color: var(--primary);
+            border: 1px solid rgba(0, 242, 255, 0.25);
+        }
+
+        .badge-2 {
+            background: rgba(255, 0, 123, 0.12);
+            color: var(--accent);
+            border: 1px solid rgba(255, 0, 123, 0.25);
+        }
+
+        .card-title {
+            font-size: clamp(1.15rem, 3.5vw, 1.45rem);
+            font-weight: 700;
+            line-height: 1.2;
+            margin-top: 0.15rem;
+        }
+
+        .card-desc {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.45);
+            line-height: 1.65;
+        }
+
+        .card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-top: 0.35rem;
+        }
+
+        .tag {
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.35);
+        }
+
+        .play-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            margin-top: 1.25rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.45);
+            transition: color 0.2s ease;
+        }
+
+        .play-btn svg { transition: transform 0.25s ease; }
+        .game-card:hover .play-btn { color: white; }
+        .game-card:hover .play-btn svg { transform: translateX(5px); }
+
+        /* ── Footer ── */
+        footer {
+            margin-top: 4rem;
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.18);
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
+        /* ── Responsive tweaks ── */
+        @media (max-width: 400px) {
+            body { padding: 1.5rem 0.75rem 3rem; }
+            header { margin-bottom: 2.5rem; }
+            .game-card { padding: 1.5rem 1.25rem 1.25rem; border-radius: 18px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">HK GAMES</div>
+        <p class="tagline">Arcade Collection</p>
+    </header>
+
+    <div class="game-grid">
+
+        <a class="game-card card-1" href="games.html">
+            <span class="card-icon">🏃</span>
+            <span class="card-badge badge-1">Action</span>
+            <h2 class="card-title">Stickman Run</h2>
+            <p class="card-desc">Dodge obstacles as a stickman runner. Two modes — space-jump and key-match. Speed ramps up every 10 obstacles.</p>
+            <div class="card-tags">
+                <span class="tag">Keyboard</span>
+                <span class="tag">Touch</span>
+                <span class="tag">2 Levels</span>
+                <span class="tag">Score Multiplier</span>
+            </div>
+            <span class="play-btn">
+                Play Now
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            </span>
+        </a>
+
+        <a class="game-card card-2" href="games2.html">
+            <span class="card-icon">⌨️</span>
+            <span class="card-badge badge-2">Typing</span>
+            <h2 class="card-title">Typing Academy</h2>
+            <p class="card-desc">Lane-based typing runner. Match falling letter obstacles by typing the correct key before they hit you. Speed increases with your score.</p>
+            <div class="card-tags">
+                <span class="tag">Keyboard</span>
+                <span class="tag">Touch</span>
+                <span class="tag">Training Mode</span>
+                <span class="tag">3 Lanes</span>
+            </div>
+            <span class="play-btn">
+                Play Now
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            </span>
+        </a>
+
+    </div>
+
+    <footer>© 2025 HK Games &nbsp;·&nbsp; Built with HTML, CSS &amp; Canvas</footer>
+
+</body>
+</html>
